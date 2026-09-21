@@ -1,13 +1,14 @@
-# DuckDB C API Headers
-This directory contains the C API headers of DuckDB. These headers should generally match the `TARGET_DUCKDB_VERSION` 
-that is specified in the `Makefile`. Note that these headers can be updated automatically 
-to match the `TARGET_DUCKDB_VERSION` makefile variable by running (assuming the default makefile setup):
+# DuckDB C API v2 SDK
 
-```shell
-make update_duckdb_headers
-```
+The v1 template headers have been removed. Run `make sdk` to fetch only
+`duckdb_v2.h` and `duckdb_extension_v2.h` at the revision pinned in
+`tools/fetch_sdk.py`, or point `DUCKDB_CAPI_DIR` at that checkout's
+`src/include` directory for an offline build.
 
-Of course manually updating the headers is also fine, just make sure that the headers are always from the same 
-DuckDB version and that they are not from a later release of DuckDB than is specified in the `TARGET_DUCKDB_VERSION`
-build variable. Using headers from an older version than `TARGET_DUCKDB_VERSION` is allowed, but you probably don't want
-that.
+The adapter explicitly compiles with `DUCKDB_V2_API_ALLOW_UNSTABLE=0` and
+`DUCKDB_V2_API_ALLOW_DEPRECATED=0`. Its metadata targets `C_STRUCT` / `v2.0.0`.
+This is a C API **v2-only** implementation, not a v1 extension labelled v2.
+
+The inspected preview SDK still warns that the extension ABI is not frozen.
+Use the matching pinned DuckDB checkout for validation. Do not infer a released
+cross-version compatibility guarantee from the chosen v2 API version string.

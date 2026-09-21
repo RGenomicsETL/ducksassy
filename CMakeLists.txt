@@ -1,54 +1,78 @@
-cmake_minimum_required(VERSION 3.5...3.29)
-option(DUCKDB_WASM_EXTENSION "Whether compiling for Wasm target" OFF)
+cmake_minimum_required(VERSION 3.20)
+project(ducksassy VERSION 0.1.0 LANGUAGES C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+find_program(CARGO cargo REQUIRED)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Threads REQUIRED)
+set(DUCKDB_CAPI_DIR "${CMAKE_SOURCE_DIR}/build/sdk" CACHE PATH "Pinned DuckDB C API v2 headers")
+foreach(header duckdb_v2.h duckdb_extension_v2.h)
+    if(NOT EXISTS "${DUCKDB_CAPI_DIR}/${header}")
+        message(FATAL_ERROR "Missing ${header}; run make sdk or set DUCKDB_CAPI_DIR. No v1 fallback.")
+    endif()
+endforeach()
+set(CARGO_TARGET_DIR "${CMAKE_SOURCE_DIR}/rust/target" CACHE PATH "Cargo build output")
+set(RUST_LIBRARY "${CARGO_TARGET_DIR}/release/libsassy_c.a")
+add_custom_command(OUTPUT "${RUST_LIBRARY}"
+    COMMAND ${CMAKE_COMMAND} -E env "CARGO_TARGET_DIR=${CARGO_TARGET_DIR}" "RUSTFLAGS=-C relocation-model=pic"
+        ${CARGO} build --release --manifest-path "${CMAKE_SOURCE_DIR}/rust/Cargo.toml"
+    DEPENDS rust/Cargo.toml rust/src/lib.rs
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    VERBATIM)
+add_custom_target(sassy_rust DEPENDS "${RUST_LIBRARY}")
+add_library(sassy_c STATIC IMPORTED GLOBAL)
+set_target_properties(sassy_c PROPERTIES IMPORTED_LOCATION "${RUST_LIBRARY}")
+add_dependencies(sassy_c sassy_rust)
 
-###
-# Configuration
-###
-if(NOT DEFINED EXTENSION_NAME)
-    message(FATAL_ERROR "DuckDB extension name is required")
+set(NATIVE_LIBS Threads::Threads ${CMAKE_DL_LIBS})
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND NATIVE_LIBS m rt util)
+elseif(NOT APPLE)
+    message(FATAL_ERROR "This initial build supports Linux/macOS. Windows/WASM are not yet validated.")
 endif()
-if (DEFINED TARGET_DUCKDB_VERSION_MAJOR)
-    add_definitions(-DDUCKDB_EXTENSION_API_VERSION_MAJOR=${TARGET_DUCKDB_VERSION_MAJOR})
+add_library(ducksassy SHARED src/ducksassy.c)
+target_include_directories(ducksassy PRIVATE include "${DUCKDB_CAPI_DIR}")
+target_link_libraries(ducksassy PRIVATE sassy_c ${NATIVE_LIBS})
+set_target_properties(ducksassy PROPERTIES PREFIX "" C_VISIBILITY_PRESET hidden)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(ducksassy PRIVATE -Wall -Wextra -Werror=implicit-function-declaration -Werror=incompatible-pointer-types)
 endif()
-if (DEFINED TARGET_DUCKDB_VERSION_MINOR)
-    add_definitions(-DDUCKDB_EXTENSION_API_VERSION_MINOR=${TARGET_DUCKDB_VERSION_MINOR})
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(ducksassy PRIVATE -Wl,--exclude-libs,ALL)
 endif()
-if (DEFINED TARGET_DUCKDB_VERSION_PATCH)
-    add_definitions(-DDUCKDB_EXTENSION_API_VERSION_PATCH=${TARGET_DUCKDB_VERSION_PATCH})
+set(DUCKDB_PLATFORM "" CACHE STRING "Exact PRAGMA platform value for the deployment host")
+if(NOT DUCKDB_PLATFORM)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+            set(DUCKDB_PLATFORM linux_amd64)
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+            set(DUCKDB_PLATFORM linux_arm64)
+        endif()
+    elseif(APPLE)
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+            set(DUCKDB_PLATFORM osx_arm64)
+        else()
+            set(DUCKDB_PLATFORM osx_amd64)
+        endif()
+    endif()
 endif()
-
-add_definitions(-DDUCKDB_EXTENSION_NAME=${EXTENSION_NAME})
-
-if (DEFINED DUCKDB_EXTENSION_API_VERSION_UNSTABLE)
-    add_definitions(-DDUCKDB_EXTENSION_API_VERSION_UNSTABLE=${DUCKDB_EXTENSION_API_VERSION_UNSTABLE})
+if(NOT DUCKDB_PLATFORM)
+    message(FATAL_ERROR "Set DUCKDB_PLATFORM to the deployment host's PRAGMA platform value")
 endif()
-
-###
-# Build
-###
-project(${EXTENSION_NAME} LANGUAGES C)
-
-# Create Extension library
-set(EXTENSION_SOURCES
-        src/add_numbers.c
-        src/capi_quack.c
-)
-
-if (DUCKDB_WASM_EXTENSION)
-	add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
-else()
-	add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
+set(METADATA_TOOL "${CMAKE_SOURCE_DIR}/extension-ci-tools/scripts/append_extension_metadata.py")
+if(NOT EXISTS "${METADATA_TOOL}")
+    message(FATAL_ERROR "Initialize the pinned extension-ci-tools submodule: git submodule update --init")
 endif()
-
-# Hide symbols
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_C_VISIBILITY_PRESET hidden)
-set(VISIBILITY_INLINES_HIDDEN ON)
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
-
-# Include own headers
-target_include_directories(${EXTENSION_NAME} PRIVATE src/include)
-
-# Include DuckDB C API headers
-target_include_directories(${EXTENSION_NAME} PRIVATE duckdb_capi)
+add_custom_command(TARGET ducksassy POST_BUILD
+    COMMAND ${Python3_EXECUTABLE} "${METADATA_TOOL}"
+        --library-file "$<TARGET_FILE:ducksassy>" --extension-name ducksassy
+        --out-file "${CMAKE_BINARY_DIR}/ducksassy.duckdb_extension"
+        --duckdb-platform "${DUCKDB_PLATFORM}" --duckdb-version v2.0.0
+        --extension-version 0.1.0-dev --abi-type C_STRUCT
+    VERBATIM)
+enable_testing()
+add_executable(test_c_abi test/c/test_abi.c)
+target_include_directories(test_c_abi PRIVATE include)
+target_link_libraries(test_c_abi PRIVATE sassy_c ${NATIVE_LIBS})
+add_test(NAME c_abi COMMAND test_c_abi)
