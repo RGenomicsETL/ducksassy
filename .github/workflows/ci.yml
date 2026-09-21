@@ -2,25 +2,30 @@ name: C API v2 and Rust C library
 on:
   pull_request:
   push:
-    branches: [main, 'feat/**']
+    branches: [main, develop]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      sdk_revision: ${{ steps.sdk.outputs.revision }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@1.91.0
       - name: Fetch pinned v2 SDK
-        run: make sdk
+        id: sdk
+        run: |
+          make sdk
+          echo "revision=$(python3 -c 'import json; print(json.load(open("ducksassy-package.json"))["duckdb_sdk_revision"])')" >> "$GITHUB_OUTPUT"
       - name: Architecture checks
         run: python3 test/check_contract.py
-      - name: Rust tests
-        run: cargo test --manifest-path rust/Cargo.toml
+      - name: Stage locked Rust dependencies
+        run: cargo fetch --locked --manifest-path rust/Cargo.toml
       - name: Build C adapter and run the real C ABI test
         run: make test
       - name: Check loadable entrypoint and absence of DuckDB linkage
@@ -34,12 +39,12 @@ jobs:
           name: ducksassy-linux-amd64
           path: |
             build/ducksassy.duckdb_extension
-            rust/target/release/libsassy_c.a
+            build/libsassy_c.a
             include/sassy_c.h
             rust/Cargo.lock
             sql/ducksassy.sql
   sql-integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: build
     steps:
@@ -48,15 +53,15 @@ jobs:
         with:
           name: ducksassy-linux-amd64
           path: artifacts
-      - uses: actions/checkout@v4
+      - name: Stage checksum-pinned DuckHTS
+        run: python3 tools/stage_runtime.py duckhts
+      - uses: actions/cache@v4
+        id: host
         with:
-          repository: duckdb/duckdb
-          ref: fece4143738e2b1d05a851d5c5dc036838aff8ec
-          path: .deps/duckdb
-      - name: Build matching v2-preview DuckDB host
-        run: |
-          cmake -S .deps/duckdb -B .deps/duckdb/build/release -DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF
-          cmake --build .deps/duckdb/build/release -j2
+          path: .deps/duckdb-build/duckdb
+          key: duckdb-ubuntu24.04-${{ runner.arch }}-${{ needs.build.outputs.sdk_revision }}-release-json-parquet-v1
+      - name: Stage matching v2-preview DuckDB host
+        run: python3 tools/stage_runtime.py duckdb --jobs 2
       - name: Test real DuckHTS dependency, SQL functions and multi-chunk execution
         run: |
-          python3 test/run_sql.py --duckdb .deps/duckdb/build/release/duckdb --extension artifacts/build/ducksassy.duckdb_extension
+          python3 test/run_sql.py --extension artifacts/build/ducksassy.duckdb_extension

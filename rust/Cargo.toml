@@ -14,11 +14,14 @@ crate-type = ["staticlib", "rlib"]
 sassy = { version = "=0.2.1", default-features = false }
 
 [features]
-default = ["portable"]
-portable = ["sassy/scalar"]
+default = ["backend-scalar"]
+backend-scalar = ["sassy/scalar"]
+backend-avx2 = []
+backend-avx512 = []
+backend-neon = []
 
 [profile.release]
-lto = true
+lto = false
 codegen-units = 1
 panic = "unwind"
 

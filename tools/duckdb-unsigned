@@ -1,0 +1,5 @@
+#!/bin/sh
+# duckknit's CLI launcher accepts an executable path, without extra CLI flags.
+set -eu
+: "${DUCKDB_CLI:=.deps/duckdb-build/duckdb}"
+exec "$DUCKDB_CLI" -unsigned -no-init "$@"

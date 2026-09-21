@@ -3,7 +3,20 @@ project(ducksassy VERSION 0.1.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if(CMAKE_CROSSCOMPILING)
+    message(FATAL_ERROR "The native backend build requires matching C and Rust host targets")
+endif()
 find_program(CARGO cargo REQUIRED)
+find_program(RUSTC rustc REQUIRED)
+execute_process(COMMAND ${RUSTC} -vV OUTPUT_VARIABLE RUSTC_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(REGEX MATCH "host: ([^\r\n]+)" _ "${RUSTC_VERSION}")
+set(RUST_TARGET "${CMAKE_MATCH_1}")
+if(NOT RUST_TARGET)
+    message(FATAL_ERROR "Could not determine Rust host target")
+endif()
+string(TOUPPER "${RUST_TARGET}" RUST_TARGET_ENV_SUFFIX)
+string(REPLACE "-" "_" RUST_TARGET_ENV_SUFFIX "${RUST_TARGET_ENV_SUFFIX}")
+set(RUST_TARGET_RUSTFLAGS_ENV "CARGO_TARGET_${RUST_TARGET_ENV_SUFFIX}_RUSTFLAGS")
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 find_package(Threads REQUIRED)
 set(DUCKDB_CAPI_DIR "${CMAKE_SOURCE_DIR}/build/sdk" CACHE PATH "Pinned DuckDB C API v2 headers")
@@ -13,16 +26,99 @@ foreach(header duckdb_v2.h duckdb_extension_v2.h)
     endif()
 endforeach()
 set(CARGO_TARGET_DIR "${CMAKE_SOURCE_DIR}/rust/target" CACHE PATH "Cargo build output")
-set(RUST_LIBRARY "${CARGO_TARGET_DIR}/release/libsassy_c.a")
-add_custom_command(OUTPUT "${RUST_LIBRARY}"
-    COMMAND ${CMAKE_COMMAND} -E env "CARGO_TARGET_DIR=${CARGO_TARGET_DIR}" "RUSTFLAGS=-C relocation-model=pic"
-        ${CARGO} build --release --manifest-path "${CMAKE_SOURCE_DIR}/rust/Cargo.toml"
-    DEPENDS rust/Cargo.toml rust/src/lib.rs
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+set(SASSY_BACKEND_LIBRARIES)
+set(SASSY_BACKEND_DEFINITIONS)
+# Target-specific flags keep build scripts portable; per-ISA metadata gives
+# same-feature Rust dependencies distinct symbol identities in the archive.
+function(add_sassy_backend NAME FEATURE RUST_FLAGS)
+    set(backend_library "${CARGO_TARGET_DIR}/${NAME}/${RUST_TARGET}/release/libsassy_c.a")
+    add_custom_command(OUTPUT "${backend_library}"
+        COMMAND ${CMAKE_COMMAND} -E env --unset=RUSTFLAGS --unset=CARGO_ENCODED_RUSTFLAGS
+            "CARGO_TARGET_DIR=${CARGO_TARGET_DIR}/${NAME}" "CARGO_PROFILE_RELEASE_LTO=false"
+            "${RUST_TARGET_RUSTFLAGS_ENV}=-C relocation-model=pic -C metadata=sassy_c_${NAME} ${RUST_FLAGS}"
+            ${CARGO} build --release --locked --offline --no-default-features --features "${FEATURE}"
+            --target "${RUST_TARGET}" --manifest-path "${CMAKE_SOURCE_DIR}/rust/Cargo.toml"
+        DEPENDS rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock rust/src/lib.rs
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        VERBATIM)
+    list(APPEND SASSY_BACKEND_LIBRARIES "${backend_library}")
+    set(SASSY_BACKEND_LIBRARIES "${SASSY_BACKEND_LIBRARIES}" PARENT_SCOPE)
+endfunction()
+
+add_sassy_backend(scalar backend-scalar "")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+    add_sassy_backend(avx2 backend-avx2 "-C target-feature=+avx2,+popcnt")
+    add_sassy_backend(avx512 backend-avx512
+        "-C target-feature=+avx2,+popcnt,+avx512f,+avx512bw")
+    list(APPEND SASSY_BACKEND_DEFINITIONS SASSY_C_HAVE_AVX2=1 SASSY_C_HAVE_AVX512=1)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_sassy_backend(neon backend-neon "-C target-feature=+neon")
+    list(APPEND SASSY_BACKEND_DEFINITIONS SASSY_C_HAVE_NEON=1)
+endif()
+
+add_library(sassy_dispatch OBJECT src/sassy_dispatch.c)
+target_include_directories(sassy_dispatch PRIVATE include src)
+target_compile_definitions(sassy_dispatch PRIVATE ${SASSY_BACKEND_DEFINITIONS})
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(sassy_dispatch PRIVATE -Wall -Wextra
+        -Werror=implicit-function-declaration -Werror=incompatible-pointer-types)
+endif()
+
+set(SASSY_C_LIBRARY "${CMAKE_BINARY_DIR}/libsassy_c.a")
+set(SASSY_COMBINE_SCRIPT "${CMAKE_BINARY_DIR}/combine_sassy_c.cmake")
+file(CONFIGURE OUTPUT "${SASSY_COMBINE_SCRIPT}" CONTENT [=[
+if(NOT DEFINED SASSY_C_OUTPUT OR NOT DEFINED SASSY_C_AR OR
+   NOT DEFINED SASSY_C_RANLIB OR NOT DEFINED SASSY_C_DISPATCH_OBJECT OR
+   NOT DEFINED SASSY_C_BACKEND_ARCHIVES)
+    message(FATAL_ERROR "Missing Sassy archive-combination inputs")
+endif()
+string(REPLACE "|" ";" backend_archives "${SASSY_C_BACKEND_ARCHIVES}")
+set(staging "${SASSY_C_OUTPUT}.objects")
+file(REMOVE_RECURSE "${staging}")
+file(MAKE_DIRECTORY "${staging}")
+set(backend_objects)
+foreach(archive IN LISTS backend_archives)
+    string(MD5 archive_id "${archive}")
+    set(archive_staging "${staging}/${archive_id}")
+    file(MAKE_DIRECTORY "${archive_staging}")
+    execute_process(COMMAND "${SASSY_C_AR}" x "${archive}"
+        WORKING_DIRECTORY "${archive_staging}" RESULT_VARIABLE status)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "Could not extract ${archive}")
+    endif()
+    file(GLOB objects "${archive_staging}/*.o")
+    if(NOT objects)
+        message(FATAL_ERROR "No object files found in ${archive}")
+    endif()
+    list(APPEND backend_objects ${objects})
+endforeach()
+file(REMOVE "${SASSY_C_OUTPUT}")
+execute_process(COMMAND "${SASSY_C_AR}" qc "${SASSY_C_OUTPUT}"
+    "${SASSY_C_DISPATCH_OBJECT}" ${backend_objects} RESULT_VARIABLE status)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "Could not create ${SASSY_C_OUTPUT}")
+endif()
+execute_process(COMMAND "${SASSY_C_RANLIB}" "${SASSY_C_OUTPUT}" RESULT_VARIABLE status)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "Could not index ${SASSY_C_OUTPUT}")
+endif()
+]=] @ONLY)
+string(REPLACE ";" "|" SASSY_BACKEND_ARCHIVE_ARGUMENT "${SASSY_BACKEND_LIBRARIES}")
+add_custom_command(OUTPUT "${SASSY_C_LIBRARY}"
+    COMMAND ${CMAKE_COMMAND}
+        "-DSASSY_C_OUTPUT=${SASSY_C_LIBRARY}"
+        "-DSASSY_C_AR=${CMAKE_AR}"
+        "-DSASSY_C_RANLIB=${CMAKE_RANLIB}"
+        "-DSASSY_C_DISPATCH_OBJECT=$<TARGET_OBJECTS:sassy_dispatch>"
+        "-DSASSY_C_BACKEND_ARCHIVES=${SASSY_BACKEND_ARCHIVE_ARGUMENT}"
+        -P "${SASSY_COMBINE_SCRIPT}"
+    DEPENDS "$<TARGET_OBJECTS:sassy_dispatch>" ${SASSY_BACKEND_LIBRARIES}
+        "${SASSY_COMBINE_SCRIPT}"
     VERBATIM)
-add_custom_target(sassy_rust DEPENDS "${RUST_LIBRARY}")
+add_custom_target(sassy_rust DEPENDS "${SASSY_C_LIBRARY}")
+add_dependencies(sassy_rust sassy_dispatch)
 add_library(sassy_c STATIC IMPORTED GLOBAL)
-set_target_properties(sassy_c PROPERTIES IMPORTED_LOCATION "${RUST_LIBRARY}")
+set_target_properties(sassy_c PROPERTIES IMPORTED_LOCATION "${SASSY_C_LIBRARY}")
 add_dependencies(sassy_c sassy_rust)
 
 set(NATIVE_LIBS Threads::Threads ${CMAKE_DL_LIBS})
@@ -76,3 +172,23 @@ add_executable(test_c_abi test/c/test_abi.c)
 target_include_directories(test_c_abi PRIVATE include)
 target_link_libraries(test_c_abi PRIVATE sassy_c ${NATIVE_LIBS})
 add_test(NAME c_abi COMMAND test_c_abi)
+
+add_executable(test_c_dispatch test/c/test_dispatch.c)
+target_include_directories(test_c_dispatch PRIVATE include)
+target_link_libraries(test_c_dispatch PRIVATE sassy_c ${NATIVE_LIBS})
+foreach(backend scalar avx2 avx512 neon)
+    add_test(NAME c_dispatch_${backend} COMMAND test_c_dispatch ${backend})
+    set_tests_properties(c_dispatch_${backend} PROPERTIES SKIP_RETURN_CODE 77)
+endforeach()
+add_test(NAME c_dispatch_auto COMMAND test_c_dispatch auto)
+add_test(NAME c_dispatch_unavailable COMMAND test_c_dispatch unavailable)
+add_test(NAME c_dispatch_unknown COMMAND test_c_dispatch unknown)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+    find_program(QEMU_X86_64_STATIC qemu-x86_64-static)
+    if(QEMU_X86_64_STATIC)
+        add_test(NAME c_dispatch_qemu_scalar
+            COMMAND ${QEMU_X86_64_STATIC} -cpu Nehalem $<TARGET_FILE:test_c_dispatch> auto)
+        add_test(NAME c_dispatch_qemu_unavailable
+            COMMAND ${QEMU_X86_64_STATIC} -cpu Nehalem $<TARGET_FILE:test_c_dispatch> unavailable)
+    endif()
+endif()

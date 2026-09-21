@@ -8,5 +8,27 @@
   "duckdb_c_api_major": 2,
   "allow_unstable_symbols": false,
   "duckdb_sdk_revision": "fece4143738e2b1d05a851d5c5dc036838aff8ec",
-  "sassy_crate": "0.2.1"
+  "r_integration_host": {
+    "package": "duckdb.2.0.dev",
+    "revision": "191e68535c1f89c7c8fac370a49b54e4d8127bbf",
+    "engine_revision": "bcff50365875c455f6c402c06838007f0ced9ca7"
+  },
+  "sassy_crate": "0.2.1",
+  "sassy_source_revision": "cda6b17092d9b7645d6d0fe11863947de0cd83dc",
+  "duckdb_sdk_sha256": {
+    "duckdb_v2.h": "0f134bd33f1ee1a511f21d5ad122213d5897320c301d5dca9d5fb24a658acd73",
+    "duckdb_extension_v2.h": "0f69df71d9de3d1d707a95ff8403a6aebbde2e29077a035d201affe73b91cc2f"
+  },
+  "duckhts_integration": {
+    "version": "1.5.2",
+    "platform": "linux_amd64",
+    "url": "https://community-extensions.duckdb.org/v1.5.5/linux_amd64/duckhts.duckdb_extension.gz",
+    "archive_sha256": "9df0025d9ea52960482c2f10e5aafe83d281cfd5a2289de7b71a82f96f0cf827",
+    "archive_bytes": 4511549,
+    "sha256": "ecc94eb3efbaf61e7d9a4f93cd4acba6817dd8624284021f3a1b7f0b2be30d77"
+  },
+  "r_tools": {
+    "duckknit_revision": "8038e8c1b30fde34f9666fae04284160257b714b",
+    "duckhtsbench_revision": "853d412fa87efcb5a7796a757b049b2b7d1692e7"
+  }
 }

@@ -17,21 +17,48 @@ extern "C" {
 
 typedef struct sassy_c_searcher sassy_c_searcher;
 typedef struct sassy_c_result sassy_c_result;
-typedef struct { const uint8_t *data; size_t len; } sassy_c_slice;
+/* SCALAR follows Sassy's baseline-build feature, including SSE2 on x86-64. */
+typedef enum {
+    SASSY_C_BACKEND_SCALAR,
+    SASSY_C_BACKEND_AVX2,
+    SASSY_C_BACKEND_AVX512,
+    SASSY_C_BACKEND_NEON,
+    SASSY_C_BACKEND_COUNT
+} sassy_c_backend;
+typedef struct {
+    const uint8_t *data;
+    size_t len;
+} sassy_c_slice;
 typedef struct {
     uint32_t struct_size, all_endpoints, include_cigar, reserved;
     uint64_t max_hits, max_text_bytes;
 } sassy_c_options;
+typedef struct {
+    uint32_t struct_size;
+    uint32_t pam_length;
+    uint32_t allow_pam_edits;
+    uint32_t include_cigar;
+    uint64_t max_hits;
+    uint64_t max_text_bytes;
+    float max_n_frac;
+} sassy_c_crispr_options;
 typedef struct {
     uint64_t pattern_idx, text_start, text_end, pattern_start, pattern_end;
     int32_t cost;
     uint32_t strand;
     uint64_t cigar_offset, cigar_length;
 } sassy_c_hit;
+typedef struct {
+    uint32_t struct_size;
+    sassy_c_backend backend;
+    uint32_t compiled;
+    uint32_t supported;
+    uint32_t selected;
+} sassy_c_backend_status;
 
 /* ABI 1: sizeof(options)=32, sizeof(hit)=64. Initialize reserved=0 and
  * struct_size=sizeof(sassy_c_options). Flags are 0/1, not ABI-dependent enums.
- * DNA/IUPAC inputs are uppercase; ASCII uses literal bytes <128 (NUL allowed).
+ * DNA/IUPAC inputs accept either case; ASCII uses literal bytes <128 (NUL allowed).
  * Empty texts/panels produce an empty result. Empty/NULL panel elements error.
  * Patterns contain 1..4096 bytes, panels <=4096 patterns, k < every pattern length.
  * All text coordinates are zero-based, half-open in the original text.
@@ -50,15 +77,32 @@ typedef struct {
  */
 uint32_t sassy_c_abi_version(void);
 const char *sassy_c_last_error(void); /* thread-local; next fallible call invalidates */
+const char *sassy_c_backend_name(sassy_c_backend backend); /* NULL for an unknown value. */
+/* Set SASSY_C_BACKEND=auto|scalar|avx2|avx512|neon before the first search call.
+ * Selection (including an unavailable/unknown selection error) is fixed for the
+ * loaded library. Each result and searcher uses that same backend throughout
+ * its lifetime. Set out->struct_size=sizeof(*out); status queries do not select. */
+int32_t sassy_c_backend_status_get(sassy_c_backend backend, sassy_c_backend_status *out);
 int32_t sassy_c_searcher_new(uint32_t alphabet, uint32_t rc, sassy_c_searcher **out);
 void sassy_c_searcher_free(sassy_c_searcher *searcher);
-int32_t sassy_c_search(sassy_c_searcher *searcher, sassy_c_slice pattern,
-    sassy_c_slice text, uint32_t k, const sassy_c_options *options, sassy_c_result **out);
+int32_t sassy_c_search(sassy_c_searcher *searcher, sassy_c_slice pattern, sassy_c_slice text,
+                       uint32_t k, const sassy_c_options *options, sassy_c_result **out);
 int32_t sassy_c_search_many(sassy_c_searcher *searcher, const sassy_c_slice *patterns,
-    size_t n_patterns, sassy_c_slice text, uint32_t k,
-    const sassy_c_options *options, sassy_c_result **out);
-int32_t sassy_c_result_view(const sassy_c_result *result, const sassy_c_hit **hits,
-    size_t *count, const uint8_t **cigars, size_t *cigar_bytes);
+                            size_t n_patterns, sassy_c_slice text, uint32_t k,
+                            const sassy_c_options *options, sassy_c_result **out);
+/* CRISPR uses an IUPAC searcher and Sassy 0.2.1 CLI endpoint-filter semantics.
+ * Guides include a trailing PAM of pam_length >= 1; a panel shares identical
+ * PAM suffix bytes. All qualifying endpoints are searched, with unit edit costs
+ * over the complete guide including PAM. allow_pam_edits=0 applies the exact
+ * IUPAC PAM endpoint filter, not a separate constrained-alignment scoring model.
+ * N/n content is filtered over the full target match, including PAM, with a
+ * float32 fraction in [0,1]. max_hits counts retained matches after this filter.
+ * sizeof(crispr_options)=40; struct_size and flags follow the rules above. */
+int32_t sassy_c_crispr_search_many(sassy_c_searcher *searcher, const sassy_c_slice *guides,
+                                   size_t n_guides, sassy_c_slice text, uint32_t k,
+                                   const sassy_c_crispr_options *options, sassy_c_result **out);
+int32_t sassy_c_result_view(const sassy_c_result *result, const sassy_c_hit **hits, size_t *count,
+                            const uint8_t **cigars, size_t *cigar_bytes);
 void sassy_c_result_free(sassy_c_result *result);
 
 #ifdef __cplusplus

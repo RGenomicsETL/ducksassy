@@ -1,5 +1,19 @@
+---
+output:
+  github_document:
+    html_preview: false
+    pandoc_args: ["--wrap=preserve"]
+---
 
 <!-- README.md is generated from README.Rmd with duckknit. -->
+
+```{r setup, include=FALSE}
+knitr::knit_engines$set(sql = duckknit::eng_duckdb)
+knitr::opts_chunk$set(
+  session = "ducksassy-readme", mode = "markdown", results = "asis",
+  error = FALSE, comment = NA
+)
+```
 
 # ducksassy
 
@@ -14,22 +28,16 @@ sequence files. Results compose with ordinary SQL filters, joins and aggregates.
 
 Find a pattern in each record, returning its coordinates, strand and CIGAR:
 
-``` sql
+```{sql fasta-matching}
 SELECT name AS reference_name, hit.text_start, hit.text_end, hit.strand, hit.cigar
 FROM sassy_search_fasta('test/data/references.fasta', 'ACGTAGG', 0,
                        alphabet := 'iupac', rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-| reference_name | text_start | text_end | strand | cigar |
-|----------------|-----------:|---------:|--------|-------|
-| ambiguous      |          2 |        9 | \+     | 7=    |
-| forward        |          2 |        9 | \+     | 7=    |
-| masked         |          2 |        9 | \+     | 7=    |
-
 `alphabet := 'iupac'` treats ambiguous bases, including N, as compatible IUPAC
 symbols. `sassy_panel_search_fasta()` accepts a list of patterns. Both functions
-retain DuckHTS’s reader columns and scan sequentially without creating an index.
+retain DuckHTS's reader columns and scan sequentially without creating an index.
 The bundled examples use the [test fixtures](test/data/README.md).
 
 ### Find CRISPR guide candidates
@@ -37,19 +45,11 @@ The bundled examples use the [test fixtures](test/data/README.md).
 Guides include their trailing PAM. This short synthetic guide demonstrates a
 search allowing one edit; it is not an experimental guide design.
 
-``` sql
+```{sql crispr-fasta}
 SELECT name AS reference_name, hit.text_start, hit.text_end, hit.cost, hit.strand, hit.cigar
 FROM sassy_crispr_search_fasta('test/data/references.fasta', 'ACGTNGG', 1)
 ORDER BY name, hit.text_start, hit.text_end, hit.strand;
 ```
-
-| reference_name | text_start | text_end | cost | strand | cigar  |
-|----------------|-----------:|---------:|-----:|--------|--------|
-| deletion       |          2 |        8 |    1 | \+     | 1=1I5= |
-| forward        |          2 |        9 |    0 | \+     | 7=     |
-| insertion      |          2 |       10 |    1 | \+     | 2=1D5= |
-| masked         |          2 |        9 |    0 | \+     | 7=     |
-| reverse        |          2 |        9 |    0 | \-     | 7=     |
 
 `sassy_crispr_panel_search_fasta()` searches a guide panel.
 `sassy_crispr_matches()` and `sassy_crispr_matches_many()` search sequence values
@@ -59,7 +59,7 @@ directly.
 
 CTEs, views and user tables can supply sequences and per-guide settings:
 
-``` sql
+```{sql relational-crispr}
 WITH guides(guide_id, guide, pam_length) AS (
     VALUES ('g1', 'ACGTNGG', 3), ('g2', 'ACGTAGG', 2)
 ), targets AS (
@@ -73,65 +73,42 @@ CROSS JOIN LATERAL unnest(sassy_crispr_matches(guide, bases, 0,
 ORDER BY reference_name, guide_id, hit.text_start, hit.text_end, hit.strand;
 ```
 
-| reference_name | guide_id | text_start | text_end | strand |
-|----------------|----------|-----------:|---------:|--------|
-| forward        | g1       |          2 |        9 | \+     |
-| forward        | g2       |          2 |        9 | \+     |
-| masked         | g1       |          2 |        9 | \+     |
-| masked         | g2       |          2 |        9 | \+     |
-| reverse        | g1       |          2 |        9 | \-     |
-| reverse        | g2       |          2 |        9 | \-     |
-
 Use `LEFT JOIN LATERAL ... ON true` to retain rows with no hit or NULL sequence.
 
 ### Search FASTQ reads
 
-``` sql
+```{sql fastq-matching}
 SELECT name AS read_name, hit.text_start, hit.text_end, hit.cost, hit.strand, hit.cigar
 FROM sassy_search_fastq('test/data/reads.fastq', 'ACGA', 0, rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-| read_name | text_start | text_end | cost | strand | cigar |
-|-----------|-----------:|---------:|-----:|--------|-------|
-| r1        |          2 |        6 |    0 | \+     | 4=    |
-| r3        |          0 |        4 |    0 | \+     | 4=    |
-
 A panel preserves zero-based pattern indices, including duplicate patterns:
 
-``` sql
+```{sql panel-matching}
 SELECT hit.pattern_idx, count(*) AS observations
 FROM sassy_panel_search_fastq('test/data/reads.fastq', ['ACGA', 'TTGC'], 0, rc := false)
 GROUP BY hit.pattern_idx
 ORDER BY hit.pattern_idx;
 ```
 
-| pattern_idx | observations |
-|------------:|-------------:|
-|           0 |            2 |
-
 ### Search a sequence column
 
-``` sql
+```{sql sequence-relation}
 CREATE TEMP VIEW reads AS
 SELECT * FROM read_fastq('test/data/reads.fastq', scan_mode := 'sequential');
 ```
 
-``` sql
+```{sql relation-matching}
 SELECT name AS read_name, hit.text_start, hit.text_end, hit.cigar
 FROM sassy_search_table('reads', 'ACGA', 0, rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-| read_name | text_start | text_end | cigar |
-|-----------|-----------:|---------:|-------|
-| r1        |          2 |        6 | 4=    |
-| r3        |          0 |        4 | 4=    |
-
 The table helpers use a `sequence` column. For other column names or expressions,
 compose the scalar functions directly:
 
-``` sql
+```{sql scalar-composition}
 WITH matches AS (
     SELECT name AS read_name,
            unnest(sassy_matches('ACGA', sequence, 0, rc := false)) AS hit
@@ -142,26 +119,10 @@ FROM matches
 ORDER BY read_name, hit.text_start, hit.text_end;
 ```
 
-| read_name | text_start | text_end | cigar |
-|-----------|-----------:|---------:|-------|
-| r1        |          2 |        6 | 4=    |
-| r3        |          0 |        4 | 4=    |
-
-``` sql
+```{sql scalar-matching}
 SELECT sassy_contains('ACGA', 'TTACGATT', 0, rc := false) AS contains;
-```
-
-| contains |
-|----------|
-| true     |
-
-``` sql
 SELECT unnest(sassy_matches('ACGA', 'TTACGATT', 0, rc := false), recursive := true);
 ```
-
-| pattern_idx | text_start | text_end | pattern_start | pattern_end | cost | strand | cigar |
-|------------:|-----------:|---------:|--------------:|------------:|-----:|--------|-------|
-|           0 |          2 |        6 |             0 |           4 |    0 | \+     | 4=    |
 
 `sassy_matches`, `sassy_count` and `sassy_contains` also have `_many` forms for
 `VARCHAR[]` or `BLOB[]` panels. Pattern and text must use the same representation.
@@ -171,15 +132,16 @@ searching them.
 ## Matching semantics
 
 Matching uses Sassy 0.2.1. Coordinates are **zero-based, half-open** in the input
-text. `+` and `-` identify the pattern’s strand; reverse-strand CIGAR follows the
+text. `+` and `-` identify the pattern's strand; reverse-strand CIGAR follows the
 pattern direction, not SAM direction.
 
 General searches default to `alphabet := 'iupac'`, `rc := true` and
-`all_endpoints := false` (Sassy’s rightmost local minima). Set `all_endpoints := true` to report qualifying endpoints. This does not enumerate every alignment.
+`all_endpoints := false` (Sassy's rightmost local minima). Set `all_endpoints :=
+true` to report qualifying endpoints. This does not enumerate every alignment.
 For literal ASCII searches, use `alphabet := 'ascii', rc := false`.
 
 DNA accepts A/C/G/T; IUPAC also accepts R/Y/S/W/K/M/B/D/H/V/N. Both match
-case-insensitively. FASTA wrappers default to DNA and preserve the reader’s
+case-insensitively. FASTA wrappers default to DNA and preserve the reader's
 sequence representation: DuckHTS 1.5.2 uppercases FASTA sequences and may return
 NULL descriptions.
 
@@ -188,10 +150,10 @@ CRISPR searches use:
 - IUPAC matching on both strands, with `pam_length := 3` by default.
 - Unit edit distance `k` over the full guide, including PAM. Insertions and
   deletions count as edits and appear in the CIGAR.
-- `allow_pam_edits := false`: Sassy’s exact IUPAC PAM endpoint filter, not a
+- `allow_pam_edits := false`: Sassy's exact IUPAC PAM endpoint filter, not a
   separately constrained PAM alignment or Cas-specific score.
 - `max_n_frac := 0.2`: N/n content over the whole target match, including PAM,
-  compared using Sassy’s float32 rule.
+  compared using Sassy's float32 rule.
 - All qualifying endpoints. Guides in one panel must share identical PAM suffix
   bytes; separate guide rows can use different PAMs and PAM lengths.
 
@@ -202,7 +164,7 @@ Patterns contain 1–4096 bytes, panels at most 4096 patterns, and `k` must be
 smaller than every pattern length. NULL arguments produce NULL; empty text or
 an empty panel produces no hits. Empty patterns and NULL panel entries are errors.
 Use `ORDER BY` when result order matters. Reference-region offsets must be added
-by the caller using the sequence’s coordinate map.
+by the caller using the sequence's coordinate map.
 
 ## Memory limits
 
@@ -213,7 +175,7 @@ separate native searchers. Sassy buffers hits for each pattern/text pair.
 general scalar searches and 1,000,000 for CRISPR and table helpers. It is checked
 after each pattern search: it limits returned hits, not intermediate allocations. LIST output is capped at 1,048,576 hits per
 DuckDB chunk. Limits raise errors rather than truncate output. Native allocations
-are not spillable and are not fully governed by DuckDB’s `memory_limit`.
+are not spillable and are not fully governed by DuckDB's `memory_limit`.
 
 Counts and predicates use the same search but omit output CIGAR strings. Panels
 are searched pairwise. For a whole chromosome, budget native memory and raise
@@ -224,21 +186,14 @@ window overlap and duplicate reconciliation are not provided.
 
 The native library automatically selects an available backend. Inspect it with:
 
-``` sql
+```{sql backend-info}
 SELECT * FROM sassy_backend_info() ORDER BY name;
 ```
-
-| name   | compiled | supported | selected |
-|--------|----------|-----------|----------|
-| avx2   | true     | true      | true     |
-| avx512 | true     | false     | false    |
-| neon   | false    | false     | false    |
-| scalar | true     | true      | false    |
 
 Set `SASSY_C_BACKEND` to `auto`, `scalar`, `avx2`, `avx512` or `neon` before the
 first search to choose a backend. Selection is fixed for the loaded library;
 an unavailable request returns an error and requires a fresh process to change.
-The `scalar` name follows Sassy’s baseline feature and includes SSE2 on x86-64.
+The `scalar` name follows Sassy's baseline feature and includes SSE2 on x86-64.
 SSE4.1 has no separate dispatch tier. Linux x86-64 baseline and AVX2 are tested;
 AVX512 is compiled but unexecuted, and aarch64/NEON remains unverified.
 
@@ -246,9 +201,9 @@ AVX512 is compiled but unexecuted, and aarch64/NEON remains unverified.
 
 Requires the DuckDB C API v2 preview; DuckDB 1.x cannot load this extension.
 `make setup` supplies the matching CLI and SDK. Linux x86-64 prerequisites are
-C/C++ compilers, CMake \>=3.20, Python \>=3.11, Git, R \>=4.1 and rustup.
+C/C++ compilers, CMake >=3.20, Python >=3.11, Git, R >=4.1 and rustup.
 
-``` sh
+```sh
 make setup JOBS=4
 make release
 .deps/duckdb-build/duckdb -unsigned -no-init
@@ -256,7 +211,7 @@ make release
 
 In that CLI:
 
-``` sql
+```sql
 SET GLOBAL lambda_syntax='ENABLE_SINGLE_ARROW';
 INSTALL '.deps/duckhts.duckdb_extension';
 INSTALL 'build/ducksassy.duckdb_extension';
@@ -274,7 +229,7 @@ The build also produces `build/libsassy_c.a` for direct C callers.
 
 ## Development
 
-``` sh
+```sh
 make test sql-test oracle-test readme
 ```
 
