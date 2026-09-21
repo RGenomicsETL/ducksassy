@@ -1,0 +1,16 @@
+>forward exact plus-strand target
+TTACGTAGGAA
+>reverse exact minus-strand target
+TTCCTACGTAA
+>masked soft-masked target
+ttacgtaggaa
+>ambiguous high-N target
+TTNNNNAGGAA
+>pam_edit PAM substitution
+TTACGTAAGAA
+>insertion target insertion
+TTACAGTAGGAA
+>deletion target deletion
+TTAGTAGGAA
+>no_hit negative control
+CCCCCCCCCC

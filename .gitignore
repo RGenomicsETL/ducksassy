@@ -1,6 +1,7 @@
 /build/
 /rust/target/
 /.deps/
+/.pi/
 /artifacts/
 __pycache__/
 *.duckdb

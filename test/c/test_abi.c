@@ -8,6 +8,8 @@
 #include <string.h>
 _Static_assert(sizeof(sassy_c_hit) == 64, "hit ABI layout");
 _Static_assert(sizeof(sassy_c_options) == 32, "options ABI layout");
+_Static_assert(sizeof(sassy_c_crispr_options) == 40, "CRISPR options ABI layout");
+_Static_assert(offsetof(sassy_c_crispr_options, max_n_frac) == 32, "N fraction ABI offset");
 _Static_assert(offsetof(sassy_c_hit, cost) == 40, "cost ABI offset");
 _Static_assert(offsetof(sassy_c_hit, cigar_offset) == 48, "CIGAR ABI offset");
 static sassy_c_slice span(const char *s) {
@@ -39,6 +41,33 @@ int main(void) {
     sassy_c_result_free(NULL);
     sassy_c_searcher_free(searcher);
     sassy_c_searcher_free(NULL);
+
+    assert(sassy_c_searcher_new(SASSY_C_IUPAC, 1, &searcher) == SASSY_C_OK);
+    sassy_c_crispr_options crispr = {.struct_size = sizeof(crispr),
+                                     .pam_length = 3,
+                                     .allow_pam_edits = 0,
+                                     .include_cigar = 1,
+                                     .max_hits = 1000,
+                                     .max_text_bytes = 1048576,
+                                     .max_n_frac = 0.2f};
+    sassy_c_slice guides[] = {span("ACGTNGG")};
+    result = NULL;
+    assert(sassy_c_crispr_search_many(searcher, guides, 1, span("TTCCTACGTAA"), 0, &crispr,
+                                      &result) == SASSY_C_OK);
+    assert(sassy_c_result_view(result, &hits, &n, &cigars, &nc) == SASSY_C_OK);
+    assert(n == 1 && hits[0].strand == 1 && hits[0].text_start == 2 && hits[0].text_end == 9);
+    assert(nc == 2 && memcmp(cigars, "7=", 2) == 0);
+    sassy_c_result_free(result);
+    result = NULL;
+    crispr.pam_length = 8;
+    assert(sassy_c_crispr_search_many(searcher, guides, 1, span("ACGTAGG"), 0, &crispr, &result) ==
+           SASSY_C_INVALID);
+    assert(result == NULL);
+    crispr.pam_length = 3;
+    assert(sassy_c_crispr_search_many(searcher, guides, 1, span("ACGTAGG"), 0, &crispr, &result) ==
+           SASSY_C_OK);
+    sassy_c_result_free(result);
+    sassy_c_searcher_free(searcher);
     puts("C ABI tests passed");
     return 0;
 }

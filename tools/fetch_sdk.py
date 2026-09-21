@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
-"""Fetch an explicitly pinned SDK at build time; never used at extension runtime."""
+"""Stage checksum-verified SDK headers before the network-free extension build."""
 from pathlib import Path
+import hashlib
+import json
 import sys
 from urllib.request import urlopen
 
-REVISION = "fece4143738e2b1d05a851d5c5dc036838aff8ec"
-HEADERS = ("duckdb_v2.h", "duckdb_extension_v2.h")
+PACKAGE = json.loads((Path(__file__).resolve().parents[1] / "ducksassy-package.json").read_text())
+REVISION = PACKAGE["duckdb_sdk_revision"]
+HEADERS = PACKAGE["duckdb_sdk_sha256"]
 
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: fetch_sdk.py OUTPUT_DIRECTORY")
     target = Path(sys.argv[1])
     target.mkdir(parents=True, exist_ok=True)
-    for name in HEADERS:
+    for name, expected in HEADERS.items():
+        existing = target / name
+        if existing.exists() and hashlib.sha256(existing.read_bytes()).hexdigest() == expected:
+            continue
         url = f"https://raw.githubusercontent.com/duckdb/duckdb/{REVISION}/src/include/{name}"
         with urlopen(url, timeout=60) as response:
             data = response.read()
-        if b"duckdb_v2_" not in data:
-            raise RuntimeError(f"not a DuckDB C API v2 header: {name}")
+        if hashlib.sha256(data).hexdigest() != expected:
+            raise RuntimeError(f"SDK checksum mismatch: {name}")
         staging = target / (name + ".tmp")
         staging.write_bytes(data)
         staging.replace(target / name)

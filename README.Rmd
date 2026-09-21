@@ -1,5 +1,19 @@
+---
+output:
+  github_document:
+    html_preview: false
+    pandoc_args: ["--wrap=preserve"]
+---
 
 <!-- README.md is generated from README.Rmd with duckknit. -->
+
+```{r setup, include=FALSE}
+knitr::knit_engines$set(sql = duckknit::eng_duckdb)
+knitr::opts_chunk$set(
+  session = "ducksassy-readme", mode = "markdown", results = "asis",
+  error = FALSE, comment = NA
+)
+```
 
 # ducksassy
 
@@ -20,7 +34,7 @@ unsupported.
 
 Matching uses Sassy `0.2.1`. The native library selects an eligible SIMD backend
 once, using compiled implementations and CPU/OS capabilities. The `scalar` label
-follows Sassy’s feature name: it permits the baseline build, including SSE2 through
+follows Sassy's feature name: it permits the baseline build, including SSE2 through
 `wide` on x86-64, rather than guaranteeing vector-free execution. This baseline is
 always available; x86-64 builds also include AVX2 and AVX512, and aarch64 builds include
 NEON. This integration has been executed on Linux x86-64 with scalar and AVX2;
@@ -28,10 +42,10 @@ AVX512 has been compiled but not executed, and aarch64 remains unverified.
 
 ## Build
 
-The Linux x86-64 setup requires C and C++ compilers, CMake \>=3.20, Python \>=3.11,
-Git, R \>=4.1, and rustup. `rust-toolchain.toml` selects Rust 1.91.0.
+The Linux x86-64 setup requires C and C++ compilers, CMake >=3.20, Python >=3.11,
+Git, R >=4.1, and rustup. `rust-toolchain.toml` selects Rust 1.91.0.
 
-``` sh
+```sh
 make setup JOBS=4
 make test sql-test oracle-test readme
 ```
@@ -52,7 +66,7 @@ an error. The selection outcome is fixed for the loaded library, including a
 failed request; use a fresh process to change it. Separate processes also keep
 backend comparisons independent:
 
-``` sh
+```sh
 SASSY_C_BACKEND=scalar make sql-test oracle-test r-test
 SASSY_C_BACKEND=avx2 make sql-test oracle-test r-test
 ```
@@ -66,20 +80,20 @@ Start the matching preview CLI with `-unsigned`. Install a staged DuckHTS artifa
 and the built adapter, then execute `sql/ducksassy.sql` on each connection that
 needs the public macros:
 
-``` sql
+```sql
 SET GLOBAL lambda_syntax='ENABLE_SINGLE_ARROW';
 INSTALL '.deps/duckhts.duckdb_extension';
 INSTALL 'build/ducksassy.duckdb_extension';
 .read sql/ducksassy.sql
 ```
 
-`INSTALL duckhts FROM community` resolves against the host’s development commit,
+`INSTALL duckhts FROM community` resolves against the host's development commit,
 for which the community repository has no DuckHTS build. The integration workflow
 stages DuckHTS 1.5.2 from the released-host `v1.5.5` repository route and verifies
 its SHA-256 before loading. That route can change when DuckHTS is republished;
 a checksum mismatch fails staging rather than accepting a different dependency.
 
-DuckHTS 1.5.2’s SQL helpers require the preview host’s legacy-lambda setting.
+DuckHTS 1.5.2's SQL helpers require the preview host's legacy-lambda setting.
 It must be **global** because DuckHTS registers those helpers through an internal
 connection. This setting affects all connections to the database instance; use
 an isolated instance for this preview integration.
@@ -94,21 +108,10 @@ registers the low-level `__sassy_*` kernels, which also work independently.
 These examples execute through [duckknit](https://github.com/rundel/duckknit)
 in one persistent DuckDB session, using the bundled `test/data/reads.fastq` fixture.
 
-``` sql
+```{sql scalar-matching}
 SELECT sassy_contains('ACGA', 'TTACGATT', 0, rc := false) AS contains;
-```
-
-| contains |
-|----------|
-| true     |
-
-``` sql
 SELECT unnest(sassy_matches('ACGA', 'TTACGATT', 0, rc := false), recursive := true);
 ```
-
-| pattern_idx | text_start | text_end | pattern_start | pattern_end | cost | strand | cigar |
-|------------:|-----------:|---------:|--------------:|------------:|-----:|--------|-------|
-|           0 |          2 |        6 |             0 |           4 |    0 | \+     | 4=    |
 
 ### Native backend diagnostics
 
@@ -116,16 +119,9 @@ SELECT unnest(sassy_matches('ACGA', 'TTACGATT', 0, rc := false), recursive := tr
 selected backend. Inspection alone does not initialize a backend. The search
 above initializes it for this session:
 
-``` sql
+```{sql backend-info}
 SELECT * FROM sassy_backend_info() ORDER BY name;
 ```
-
-| name   | compiled | supported | selected |
-|--------|----------|-----------|----------|
-| avx2   | true     | true      | true     |
-| avx512 | true     | false     | false    |
-| neon   | false    | false     | false    |
-| scalar | true     | true      | false    |
 
 ### FASTA reference searches
 
@@ -133,22 +129,16 @@ DuckHTS scans FASTA records; Sassy searches each returned sequence. Choose
 `alphabet := 'iupac'` explicitly to treat ambiguous reference bases as compatible
 IUPAC symbols, including N as a wildcard:
 
-``` sql
+```{sql fasta-matching}
 SELECT name AS reference_name, hit.text_start, hit.text_end, hit.strand, hit.cigar
 FROM sassy_search_fasta('test/data/references.fasta', 'ACGTAGG', 0,
                        alphabet := 'iupac', rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-| reference_name | text_start | text_end | strand | cigar |
-|----------------|-----------:|---------:|--------|-------|
-| ambiguous      |          2 |        9 | \+     | 7=    |
-| forward        |          2 |        9 | \+     | 7=    |
-| masked         |          2 |        9 | \+     | 7=    |
-
 `sassy_panel_search_fasta()` accepts a pattern list. Both wrappers retain the
 columns emitted by `read_fasta()` and use sequential scanning without creating
-an index. DuckHTS 1.5.2’s sequential FASTA reader uppercases sequence and may
+an index. DuckHTS 1.5.2's sequential FASTA reader uppercases sequence and may
 return NULL descriptions; the wrappers retain that reader behavior.
 
 ### CRISPR guide candidates
@@ -156,28 +146,20 @@ return NULL descriptions; the wrappers retain that reader behavior.
 Guides include their trailing PAM. These short synthetic guides exercise the
 filters and coordinates; they are not experimental guide designs.
 
-``` sql
+```{sql crispr-fasta}
 SELECT name AS reference_name, hit.text_start, hit.text_end, hit.cost, hit.strand, hit.cigar
 FROM sassy_crispr_search_fasta('test/data/references.fasta', 'ACGTNGG', 1)
 ORDER BY name, hit.text_start, hit.text_end, hit.strand;
 ```
 
-| reference_name | text_start | text_end | cost | strand | cigar  |
-|----------------|-----------:|---------:|-----:|--------|--------|
-| deletion       |          2 |        8 |    1 | \+     | 1=1I5= |
-| forward        |          2 |        9 |    0 | \+     | 7=     |
-| insertion      |          2 |       10 |    1 | \+     | 2=1D5= |
-| masked         |          2 |        9 |    0 | \+     | 7=     |
-| reverse        |          2 |        9 |    0 | \-     | 7=     |
-
 `sassy_crispr_matches()` and `_many()` search sequence values directly;
 `sassy_crispr_panel_search_fasta()` searches a guide panel. Their model follows
-Sassy 0.2.1’s `crispr` workflow:
+Sassy 0.2.1's `crispr` workflow:
 
 - IUPAC matching on both strands by default; `pam_length := 3`.
 - `k` is unit edit distance over the complete guide including PAM. Insertions
   and deletions count as edits and appear in the CIGAR.
-- `allow_pam_edits := false` applies Sassy’s exact IUPAC PAM endpoint filter.
+- `allow_pam_edits := false` applies Sassy's exact IUPAC PAM endpoint filter.
   It is not a separately constrained PAM alignment or Cas-specific scoring model.
 - `max_n_frac := 0.2` limits N/n content over the complete target match, including
   PAM, using the upstream float32 comparison.
@@ -193,7 +175,7 @@ and enumeration of alternative alignments are not provided.
 Sequence columns can have any name. CTEs, views, DuckHTS readers and user tables
 feed the scalar kernels directly, with identifiers retained by SQL:
 
-``` sql
+```{sql relational-crispr}
 WITH guides(guide_id, guide, pam_length) AS (
     VALUES ('g1', 'ACGTNGG', 3), ('g2', 'ACGTAGG', 2)
 ), targets AS (
@@ -207,15 +189,6 @@ CROSS JOIN LATERAL unnest(sassy_crispr_matches(guide, bases, 0,
 ORDER BY reference_name, guide_id, hit.text_start, hit.text_end, hit.strand;
 ```
 
-| reference_name | guide_id | text_start | text_end | strand |
-|----------------|----------|-----------:|---------:|--------|
-| forward        | g1       |          2 |        9 | \+     |
-| forward        | g2       |          2 |        9 | \+     |
-| masked         | g1       |          2 |        9 | \+     |
-| masked         | g2       |          2 |        9 | \+     |
-| reverse        | g1       |          2 |        9 | \-     |
-| reverse        | g2       |          2 |        9 | \-     |
-
 Use a `LEFT JOIN LATERAL ... ON true` to retain rows with no hit or NULL sequence.
 Named relations with a `sequence` column also work with `sassy_search_table()` /
 `sassy_panel_search_table()` and their `sassy_crispr_*` equivalents.
@@ -224,51 +197,37 @@ Named relations with a `sequence` column also work with `sassy_search_table()` /
 
 DuckHTS scans the FASTQ records; Sassy searches each sequence:
 
-``` sql
+```{sql fastq-matching}
 SELECT name AS read_name, hit.text_start, hit.text_end, hit.cost, hit.strand, hit.cigar
 FROM sassy_search_fastq('test/data/reads.fastq', 'ACGA', 0, rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-| read_name | text_start | text_end | cost | strand | cigar |
-|-----------|-----------:|---------:|-----:|--------|-------|
-| r1        |          2 |        6 |    0 | \+     | 4=    |
-| r3        |          0 |        4 |    0 | \+     | 4=    |
-
 A panel preserves zero-based pattern indices:
 
-``` sql
+```{sql panel-matching}
 SELECT hit.pattern_idx, count(*) AS observations
 FROM sassy_panel_search_fastq('test/data/reads.fastq', ['ACGA', 'TTGC'], 0, rc := false)
 GROUP BY hit.pattern_idx
 ORDER BY hit.pattern_idx;
 ```
 
-| pattern_idx | observations |
-|------------:|-------------:|
-|           0 |            2 |
-
 Relations remain available across chunks in the same session:
 
-``` sql
+```{sql sequence-relation}
 CREATE TEMP VIEW reads AS
 SELECT * FROM read_fastq('test/data/reads.fastq', scan_mode := 'sequential');
 ```
 
-``` sql
+```{sql relation-matching}
 SELECT name AS read_name, hit.text_start, hit.text_end, hit.cigar
 FROM sassy_search_table('reads', 'ACGA', 0, rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-| read_name | text_start | text_end | cigar |
-|-----------|-----------:|---------:|-------|
-| r1        |          2 |        6 | 4=    |
-| r3        |          0 |        4 | 4=    |
-
 Any DuckHTS or user relation can feed the scalar kernel directly:
 
-``` sql
+```{sql scalar-composition}
 WITH matches AS (
     SELECT name AS read_name,
            unnest(sassy_matches('ACGA', sequence, 0, rc := false)) AS hit
@@ -278,11 +237,6 @@ SELECT read_name, hit.text_start, hit.text_end, hit.cigar
 FROM matches
 ORDER BY read_name, hit.text_start, hit.text_end;
 ```
-
-| read_name | text_start | text_end | cigar |
-|-----------|-----------:|---------:|-------|
-| r1        |          2 |        6 | 4=    |
-| r3        |          0 |        4 | 4=    |
 
 Single-pattern and panel forms of `sassy_matches`, `sassy_count`, and
 `sassy_contains` are provided. Panel forms have the `_many` suffix and accept
@@ -297,12 +251,12 @@ For literal ASCII searches use `alphabet := 'ascii', rc := false`.
 Patterns must have 1..4096 bytes, a panel at most 4096 patterns, and `k` must be
 smaller than every pattern length. DNA accepts A/C/G/T in either case. IUPAC
 accepts A/C/G/T/R/Y/S/W/K/M/B/D/H/V/N in either case; N is ambiguous, not an error
-or a mismatch penalty. Sassy’s nucleotide profiles match case-insensitively
-without rewriting the caller’s sequence.
+or a mismatch penalty. Sassy's nucleotide profiles match case-insensitively
+without rewriting the caller's sequence.
 
 A match is:
 
-``` sql
+```sql
 STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT,
        pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER,
        strand VARCHAR, cigar VARCHAR)
@@ -310,7 +264,7 @@ STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT,
 
 Coordinates are **zero-based, half-open** in the original input text. `+`/`-`
 indicate strand. Reverse-strand CIGAR is in pattern direction, not SAM direction.
-`all_endpoints=false` follows Sassy’s rightmost-local-minimum search semantics;
+`all_endpoints=false` follows Sassy's rightmost-local-minimum search semantics;
 `true` reports qualifying endpoints. Neither means every possible alignment.
 NULL arguments propagate to NULL; an empty text or panel returns no hits;
 NULL panel elements and empty patterns are errors. SQL result order is not
@@ -327,10 +281,10 @@ the duration of a callback.
 Sassy 0.2.1 returns a vector of hits for each pattern/text pair. Queries therefore
 **buffer per-record output**. The adapter checks `max_text_bytes` before searching
 and `max_hits` after each pattern search. The latter is an output cap,
-not a hard bound on Sassy’s intermediate allocations. An additional fixed
+not a hard bound on Sassy's intermediate allocations. An additional fixed
 1,048,576-hit limit bounds LIST output per DuckDB chunk. Limits raise errors;
 there is no silent truncation. Rust allocations are not spillable DuckDB buffer-
-pool allocations and are not fully governed by DuckDB’s memory_limit.
+pool allocations and are not fully governed by DuckDB's memory_limit.
 
 Counts and predicates use the same upstream search as match queries and omit
 CIGAR strings in the output adapter. Panels are searched **pairwise**. The
@@ -346,7 +300,7 @@ own contract; automatic chromosome windowing is not implemented.
 
 `include/sassy_c.h` documents the independently versioned C ABI, pointer/length
 spans, worker confinement, panic containment, ownership, resource limits, and
-borrowed views over a result’s hit array plus CIGAR slab. The library can also be
+borrowed views over a result's hit array plus CIGAR slab. The library can also be
 called directly from C. Link `libsassy_c.a` with the native system libraries
 required by the Rust toolchain. See `test/c/test_abi.c` for a complete example.
 
@@ -358,7 +312,7 @@ IUPAC, panels, limits, invalid input, result ownership and ABI layouts.
 source-contract checks. Runtime integration, including required DuckHTS,
 multiple chunks, BLOB overloads, NULLs and errors, is separate:
 
-``` sh
+```sh
 make sql-test
 ```
 
@@ -370,7 +324,7 @@ it caches the statically linked host executable by SDK revision and build profil
 `test/compare_crispr.R` compares complete hit multisets with the Sassy 0.2.1 CLI
 at the source revision pinned in `ducksassy-package.json`:
 
-``` sh
+```sh
 make oracle-test
 ```
 
@@ -386,7 +340,7 @@ Beeloo and Ragnar Groot Koerkamp; their MIT notice is in `third_party/sassy/LICE
 
 After `make setup`, run from the repository root:
 
-``` sh
+```sh
 make readme
 ```
 
