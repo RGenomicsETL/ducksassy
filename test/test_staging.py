@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("stage_runtime", ROOT / "tools/stage_runtime.py")
@@ -31,7 +32,8 @@ class RuntimeStaging(unittest.TestCase):
             "archive_bytes": len(self.archive),
             "sha256": hashlib.sha256(self.payload).hexdigest(),
         }
-        for target, value in (("ROOT", self.root), ("PACKAGE", {"duckhts_integration": self.pin})):
+        package = {"version": "test", "duckhts_integration": self.pin}
+        for target, value in (("ROOT", self.root), ("PACKAGE", package)):
             replacement = patch.object(stage, target, value)
             replacement.start()
             self.addCleanup(replacement.stop)
@@ -41,9 +43,13 @@ class RuntimeStaging(unittest.TestCase):
             self.addCleanup(replacement.stop)
 
     def test_download_validates_archive_and_payload(self):
-        with patch.object(stage, "urlopen", return_value=io.BytesIO(self.archive)) as request:
+        with patch.object(stage, "urlopen", return_value=io.BytesIO(self.archive)) as open_url:
             stage.duckhts()
-            request.assert_called_once_with(self.pin["url"], timeout=120)
+            open_url.assert_called_once()
+            request = open_url.call_args.args[0]
+            self.assertEqual(request.full_url, self.pin["url"])
+            self.assertEqual(request.get_header("User-agent"), "ducksassy-runtime-stager/test")
+            self.assertEqual(open_url.call_args.kwargs, {"timeout": 120})
         self.assertEqual(self.target.read_bytes(), self.payload)
         self.assertEqual(list(self.target.parent.iterdir()), [self.target])
 
@@ -58,6 +64,15 @@ class RuntimeStaging(unittest.TestCase):
         with patch.object(stage, "urlopen", return_value=io.BytesIO(b"corrupt archive")):
             with self.assertRaisesRegex(RuntimeError, "archive checksum mismatch"):
                 stage.duckhts()
+        self.assertEqual(self.target.read_bytes(), b"existing file")
+
+    def test_http_failure_preserves_existing_file(self):
+        self.target.write_bytes(b"existing file")
+        denied = HTTPError(self.pin["url"], 403, "Forbidden", {}, None)
+        with patch.object(stage, "urlopen", side_effect=denied):
+            with self.assertRaises(HTTPError) as failure:
+                stage.duckhts()
+        self.assertEqual(failure.exception.code, 403)
         self.assertEqual(self.target.read_bytes(), b"existing file")
 
     def test_payload_failure_does_not_publish(self):

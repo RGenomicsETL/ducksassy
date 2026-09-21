@@ -9,7 +9,7 @@ from pathlib import Path
 import platform
 import subprocess
 import tempfile
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = json.loads((ROOT / "ducksassy-package.json").read_text())
@@ -36,7 +36,10 @@ def duckhts():
     target = ROOT / ".deps/duckhts.duckdb_extension"
     if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == pin["sha256"]:
         return
-    with urlopen(pin["url"], timeout=120) as response:
+    request = Request(pin["url"], headers={
+        "User-Agent": f"ducksassy-runtime-stager/{PACKAGE['version']}",
+    })
+    with urlopen(request, timeout=120) as response:
         archive = response.read(pin["archive_bytes"] + 1)
     if hashlib.sha256(archive).hexdigest() != pin["archive_sha256"]:
         raise RuntimeError("DuckHTS archive checksum mismatch; update the pin deliberately")

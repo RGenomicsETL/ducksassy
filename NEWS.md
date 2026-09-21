@@ -1,5 +1,8 @@
 # ducksassy 0.1.0-dev
 
+- Fix DuckHTS setup downloads rejected with HTTP 403.
+- README examples lead with FASTA searches, CRISPR candidates and guide–target joins.
+
 - The standalone C library and extension select a CPU/OS-eligible scalar, AVX2, AVX512 or NEON backend, with `SASSY_C_BACKEND` forcing and recoverable errors for unavailable requests. The `scalar` label follows Sassy's baseline feature and includes SSE2 paths on x86-64. `sassy_backend_info()` reports compiled, supported and selected status. Linux x86-64 scalar and AVX2 are exercised; other backends remain platform-validation work.
 
 - FASTA single-pattern and panel searches compose DuckHTS readers with the native matching kernels.
