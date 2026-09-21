@@ -1,0 +1,12 @@
+{
+  "name": "ducksassy",
+  "version": "0.1.0-dev",
+  "native_extension": "ducksassy.duckdb_extension",
+  "public_bindings": "sql/ducksassy.sql",
+  "required_sql_extensions": ["duckhts"],
+  "dependency_loading": "explicit-sql-bootstrap",
+  "duckdb_c_api_major": 2,
+  "allow_unstable_symbols": false,
+  "duckdb_sdk_revision": "fece4143738e2b1d05a851d5c5dc036838aff8ec",
+  "sassy_crate": "0.2.1"
+}
