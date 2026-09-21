@@ -343,7 +343,3 @@ After `make setup`, run from the repository root:
 ```sh
 make readme
 ```
-
-The renderer checks the host revision before loading native code, loads both
-extensions without downloads, and closes its duckknit session on success or error.
-SQL errors fail the render. Edit `README.Rmd`; `README.md` contains executed output.
