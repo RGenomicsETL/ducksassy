@@ -18,16 +18,86 @@ knitr::opts_chunk$set(
 
 # ducksassy
 
-Search FASTA references, find CRISPR guide candidates, and match sequences in
-DuckDB tables. [Sassy](https://github.com/RagnarGrootKoerkamp/sassy) supplies
-approximate matching; [DuckHTS](https://github.com/RGenomicsETL/duckhts) reads
-sequence files. Results compose with ordinary SQL filters, joins and aggregates.
+Approximate DNA sequence search inside DuckDB.
+
+[DuckHTS](https://github.com/RGenomicsETL/duckhts) exposes FASTA and FASTQ records
+as DuckDB relations. [Sassy](https://github.com/RagnarGrootKoerkamp/sassy) supplies
+the approximate matching kernel. ducksassy connects them: file searches return
+matches with edit cost, coordinates, strand and CIGAR alongside the input
+record's columns. Scalar functions search sequence values from any relation.
+
+This follows DuckHTS's [composability model](https://github.com/RGenomicsETL/duckhts/blob/develop/ARCHITECTURE.md):
+the file reader and native matcher handle their respective mechanics; DuckDB
+handles the join, filtering and aggregation. For example, give each guide its
+own PAM length and search a FASTA relation:
+
+```{sql relational-crispr}
+WITH guides(guide_id, guide, pam_length) AS (
+    VALUES ('g1', 'ACGTNGG', 3), ('g2', 'ACGTAGG', 2)
+)
+SELECT r.name AS reference_name, g.guide_id,
+       hit.text_start, hit.text_end, hit.strand
+FROM guides AS g
+CROSS JOIN read_fasta('test/data/references.fasta', scan_mode := 'sequential') AS r
+CROSS JOIN LATERAL unnest(sassy_crispr_matches(g.guide, r.sequence, 0,
+    pam_length := g.pam_length)) AS matches(hit)
+ORDER BY reference_name, guide_id, hit.text_start, hit.text_end, hit.strand;
+```
+
+`pam_length` comes from each guide row. The lateral join expands its matches;
+the output can be joined to other annotations or grouped by guide without
+another file format. Use `LEFT JOIN LATERAL ... ON true` to retain rows with no
+hit.
+
+## What it does
+
+- Search with up to `k` substitutions, insertions or deletions. IUPAC ambiguity
+  codes work in patterns and targets; reverse-complement search is on by default.
+- Search one pattern, a panel, or a guide with a PAM. CRISPR search applies
+  Sassy's exact PAM endpoint filter and excludes targets above the configured
+  N fraction. The CRISPR semantics below spell out the filter.
+- Search files through DuckHTS, or call the scalar functions on any sequence
+  column. Results stay in DuckDB for joins, counts and downstream queries.
+
+The [measured workloads](benchmarks/sequence_search.md) include eight 23-base
+guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The report
+records the inputs, output counts, host, thread count and elapsed times.
+
+## Quick start
+
+ducksassy targets the DuckDB C API v2 preview (DuckDB 1.x cannot load it).
+`make setup` fetches the matching CLI and SDK. On Linux x86-64 you need C/C++
+compilers, CMake ≥ 3.20, Python ≥ 3.11, Git, R ≥ 4.1 and rustup.
+
+```sh
+make setup JOBS=4
+make release
+.deps/duckdb-build/duckdb -unsigned -no-init
+```
+
+Then, in the DuckDB CLI:
+
+```sql
+SET GLOBAL lambda_syntax='ENABLE_SINGLE_ARROW';
+INSTALL '.deps/duckhts.duckdb_extension';
+INSTALL 'build/ducksassy.duckdb_extension';
+.read sql/ducksassy.sql
+```
+
+The lambda setting is required by DuckHTS 1.5.2 and applies to the whole
+database instance, so use a dedicated one. The macros are connection-scoped.
+Supported host versions are pinned in
+[ducksassy-package.json](ducksassy-package.json). When upgrading, move an
+outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
 
 ## Examples
 
+Every example below runs against the bundled
+[test fixtures](test/data/README.md) and is rendered live from this README.
+
 ### Search a FASTA reference
 
-Find a pattern in each record, returning its coordinates, strand and CIGAR:
+Find a pattern in each FASTA record, with coordinates, strand and CIGAR:
 
 ```{sql fasta-matching}
 SELECT name AS reference_name, hit.text_start, hit.text_end, hit.strand, hit.cigar
@@ -36,15 +106,14 @@ FROM sassy_search_fasta('test/data/references.fasta', 'ACGTAGG', 0,
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-`alphabet := 'iupac'` treats ambiguous bases, including N, as compatible IUPAC
-symbols. `sassy_panel_search_fasta()` accepts a list of patterns. Both functions
-retain DuckHTS's reader columns and scan sequentially without creating an index.
-The bundled examples use the [test fixtures](test/data/README.md).
+With `alphabet := 'iupac'`, ambiguous bases in the reference (including N) match
+any base they could stand for. `sassy_panel_search_fasta()` takes a list of
+patterns instead. Both stream the file sequentially and need no index.
 
-### Find CRISPR guide candidates
+### Search for CRISPR sites
 
-Guides include their trailing PAM. This short synthetic guide demonstrates a
-search allowing one edit; it is not an experimental guide design.
+Allow one edit over the full guide and apply the exact PAM endpoint filter.
+This synthetic sequence illustrates the API; it is not an experimental guide.
 
 ```{sql crispr-fasta}
 SELECT name AS reference_name, hit.text_start, hit.text_end, hit.cost, hit.strand, hit.cigar
@@ -52,29 +121,9 @@ FROM sassy_crispr_search_fasta('test/data/references.fasta', 'ACGTNGG', 1)
 ORDER BY name, hit.text_start, hit.text_end, hit.strand;
 ```
 
-`sassy_crispr_panel_search_fasta()` searches a guide panel.
-`sassy_crispr_matches()` and `sassy_crispr_matches_many()` search sequence values
-directly.
-
-### Join guides and targets
-
-CTEs, views and user tables can supply sequences and per-guide settings:
-
-```{sql relational-crispr}
-WITH guides(guide_id, guide, pam_length) AS (
-    VALUES ('g1', 'ACGTNGG', 3), ('g2', 'ACGTAGG', 2)
-), targets AS (
-    SELECT name AS reference_name, sequence AS bases
-    FROM read_fasta('test/data/references.fasta', scan_mode := 'sequential')
-)
-SELECT reference_name, guide_id, hit.text_start, hit.text_end, hit.strand
-FROM guides CROSS JOIN targets
-CROSS JOIN LATERAL unnest(sassy_crispr_matches(guide, bases, 0,
-    pam_length := pam_length)) AS matches(hit)
-ORDER BY reference_name, guide_id, hit.text_start, hit.text_end, hit.strand;
-```
-
-Use `LEFT JOIN LATERAL ... ON true` to retain rows with no hit or NULL sequence.
+Use `sassy_crispr_panel_search_fasta()` for a guide panel, or
+`sassy_crispr_matches()` / `sassy_crispr_matches_many()` on sequence values, as in
+the join at the top.
 
 ### Search FASTQ reads
 
@@ -84,7 +133,8 @@ FROM sassy_search_fastq('test/data/reads.fastq', 'ACGA', 0, rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-A panel preserves zero-based pattern indices, including duplicate patterns:
+Count hits for a whole panel at once. Hits carry the zero-based `pattern_idx`,
+so duplicate patterns remain distinct:
 
 ```{sql panel-matching}
 SELECT hit.pattern_idx, count(*) AS observations
@@ -93,7 +143,9 @@ GROUP BY hit.pattern_idx
 ORDER BY hit.pattern_idx;
 ```
 
-### Search a sequence column
+### Search a table or view
+
+Anything with a `sequence` column works, including views:
 
 ```{sql sequence-relation}
 CREATE TEMP VIEW reads AS
@@ -106,47 +158,70 @@ FROM sassy_search_table('reads', 'ACGA', 0, rc := false)
 ORDER BY name, hit.text_start, hit.text_end;
 ```
 
-The table helpers use a `sequence` column. For other column names or expressions,
-compose the scalar functions directly:
+For other column names or computed sequences, use the scalar functions directly:
 
 ```{sql scalar-composition}
-WITH matches AS (
-    SELECT name AS read_name,
-           unnest(sassy_matches('ACGA', sequence, 0, rc := false)) AS hit
-    FROM reads
-)
-SELECT read_name, hit.text_start, hit.text_end, hit.cigar
-FROM matches
+SELECT r.name AS read_name, hit.text_start, hit.text_end, hit.cigar
+FROM reads AS r
+CROSS JOIN LATERAL unnest(sassy_matches('ACGA', r.sequence, 0,
+    rc := false)) AS matches(hit)
 ORDER BY read_name, hit.text_start, hit.text_end;
 ```
+
+### Search sequence values
 
 ```{sql scalar-matching}
 SELECT sassy_contains('ACGA', 'TTACGATT', 0, rc := false) AS contains;
 SELECT unnest(sassy_matches('ACGA', 'TTACGATT', 0, rc := false), recursive := true);
 ```
 
-`sassy_matches`, `sassy_count` and `sassy_contains` also have `_many` forms for
-`VARCHAR[]` or `BLOB[]` panels. Pattern and text must use the same representation.
-BLOB inputs contain sequence bytes; decode DuckHTS nt16/nt4 packed symbols before
-searching them.
+## Function cheat sheet
 
-## Matching semantics
+| Input            | One pattern                 | A panel of patterns               |
+|------------------|-----------------------------|-----------------------------------|
+| FASTA file       | `sassy_search_fasta`        | `sassy_panel_search_fasta`        |
+| FASTQ file       | `sassy_search_fastq`        | `sassy_panel_search_fastq`        |
+| Table / view     | `sassy_search_table`        | —                                 |
+| Values           | `sassy_matches`, `sassy_count`, `sassy_contains` | `sassy_matches_many`, `sassy_count_many`, `sassy_contains_many` |
+| CRISPR, FASTA    | `sassy_crispr_search_fasta` | `sassy_crispr_panel_search_fasta` |
+| CRISPR, table    | `sassy_crispr_search_table` | `sassy_crispr_panel_search_table` |
+| CRISPR, values   | `sassy_crispr_matches`      | `sassy_crispr_matches_many`       |
 
-Matching uses Sassy `r sassy_version`. Coordinates are **zero-based, half-open** in the input
-text. `+` and `-` identify the pattern's strand; reverse-strand CIGAR follows the
-pattern direction, not SAM direction.
+Value functions accept `VARCHAR` or `BLOB` (panels: `VARCHAR[]` or `BLOB[]`);
+pattern and text must use the same type. BLOBs hold plain sequence bytes, so
+decode DuckHTS nt16/nt4 packed symbols first. `sassy_count` and `sassy_contains`
+skip building CIGAR strings.
+
+## The fine print
+
+<details>
+<summary><b>Matching semantics</b>: coordinates, strands, alphabets, defaults</summary>
+
+Matching uses Sassy `r sassy_version`. Coordinates are **zero-based, half-open**
+in the input text. `+` and `-` identify the pattern's strand; reverse-strand
+CIGAR follows the pattern direction, not SAM direction.
 
 General searches default to `alphabet := 'iupac'`, `rc := true` and
-`all_endpoints := false` (Sassy's rightmost local minima). Set `all_endpoints :=
-true` to report qualifying endpoints. This does not enumerate every alignment.
-For literal ASCII searches, use `alphabet := 'ascii', rc := false`.
+`all_endpoints := false` (Sassy's rightmost local minima). Set
+`all_endpoints := true` to report every qualifying endpoint; this still does not
+enumerate every alignment. For literal ASCII searches, use
+`alphabet := 'ascii', rc := false`.
 
 DNA accepts A/C/G/T; IUPAC also accepts R/Y/S/W/K/M/B/D/H/V/N. Both match
 case-insensitively. FASTA wrappers default to DNA and preserve the reader's
 sequence representation: DuckHTS 1.5.2 uppercases FASTA sequences and may return
 NULL descriptions.
 
-CRISPR searches use:
+Patterns contain 1–4096 bytes, panels at most 4096 patterns, and `k` must be
+smaller than every pattern length. NULL arguments produce NULL; empty text or an
+empty panel produces no hits. Empty patterns and NULL panel entries are errors.
+Use `ORDER BY` when result order matters. Reference-region offsets must be added
+by the caller using the sequence's coordinate map.
+
+</details>
+
+<details>
+<summary><b>CRISPR semantics</b>: what a guide hit means</summary>
 
 - IUPAC matching on both strands, with `pam_length := 3` by default.
 - Unit edit distance `k` over the full guide, including PAM. Insertions and
@@ -155,85 +230,63 @@ CRISPR searches use:
   separately constrained PAM alignment or Cas-specific score.
 - `max_n_frac := 0.2`: N/n content over the whole target match, including PAM,
   compared using Sassy's float32 rule.
-- All qualifying endpoints. Guides in one panel must share identical PAM suffix
-  bytes; separate guide rows can use different PAMs and PAM lengths.
+- All qualifying endpoints are reported. Guides in one panel must share
+  identical PAM suffix bytes; separate guide rows can use different PAMs and PAM
+  lengths.
 
 Strand identifies a guide occurrence, not an assigned biological binding strand.
 Independent DNA/RNA-bulge limits and positional penalties are not provided.
 
-Patterns contain 1–4096 bytes, panels at most 4096 patterns, and `k` must be
-smaller than every pattern length. NULL arguments produce NULL; empty text or
-an empty panel produces no hits. Empty patterns and NULL panel entries are errors.
-Use `ORDER BY` when result order matters. Reference-region offsets must be added
-by the caller using the sequence's coordinate map.
+</details>
 
-## Memory limits
+<details>
+<summary><b>Memory limits</b>: what gets buffered and how to raise the caps</summary>
 
-DuckHTS streams records through DuckDB chunks; DuckDB schedules workers with
-separate native searchers. Sassy buffers hits for each pattern/text pair.
+DuckHTS streams records through DuckDB chunks, and DuckDB schedules workers with
+separate native searchers. Sassy buffers the hits for each pattern/text pair.
 
-`max_text_bytes` defaults to 1 MiB per sequence. `max_hits` defaults to 10,000 for
-ordinary value, FASTQ and table searches, and 1,000,000 for FASTA and CRISPR searches. It is checked
-after each pattern search: it limits returned hits, not intermediate allocations. LIST output is capped at 1,048,576 hits per
-DuckDB chunk. Limits raise errors rather than truncate output. Native allocations
-are not spillable and are not fully governed by DuckDB's `memory_limit`.
+- `max_text_bytes` defaults to 1 MiB per sequence.
+- `max_hits` defaults to 10,000 for value, FASTQ and table searches, and
+  1,000,000 for FASTA and CRISPR searches. It is checked after each pattern
+  search, so it limits returned hits, not intermediate allocations.
+- LIST output is capped at 1,048,576 hits per DuckDB chunk.
 
-Counts and predicates use the same search but omit output CIGAR strings. Panels
-are searched pairwise. For a whole chromosome, budget native memory and raise
-`max_text_bytes`, or supply regions with an explicit coordinate map. Automatic
-window overlap and duplicate reconciliation are not provided.
+Limits raise errors; they never silently truncate output. Native allocations are
+not spillable and are not fully governed by DuckDB's `memory_limit`. Panels are
+searched pairwise.
 
-## SIMD backends
+For a whole chromosome, budget native memory and raise `max_text_bytes`, or
+supply regions with an explicit coordinate map. Automatic window overlap and
+duplicate reconciliation are not provided.
 
-The native library automatically selects an available backend. Inspect it with:
+</details>
+
+<details>
+<summary><b>SIMD backends</b>: inspecting and forcing a kernel</summary>
+
+The native library selects the best available backend automatically:
 
 ```{sql backend-info}
 SELECT * FROM sassy_backend_info() ORDER BY name;
 ```
 
 Set `SASSY_C_BACKEND` to `auto`, `scalar`, `avx2`, `avx512` or `neon` before the
-first search to choose a backend. Selection is fixed for the loaded library;
-an unavailable request returns an error and requires a fresh process to change.
-The `scalar` name follows Sassy's baseline feature and includes SSE2 on x86-64.
-SSE4.1 has no separate dispatch tier. Linux x86-64 baseline and AVX2 are tested;
-AVX512 is compiled but unexecuted, and aarch64/NEON remains unverified.
+first search to force one. The choice is fixed for the loaded library; an
+unavailable request returns an error, and changing it requires a fresh process.
+`scalar` follows Sassy's baseline and includes SSE2 on x86-64; SSE4.1 has no
+separate tier. Linux x86-64 baseline and AVX2 are tested; AVX-512 is compiled
+but unexecuted, and aarch64/NEON is unverified.
 
-## Build and load
+</details>
 
-Requires the DuckDB C API v2 preview; DuckDB 1.x cannot load this extension.
-`make setup` supplies the matching CLI and SDK. Linux x86-64 prerequisites are
-C/C++ compilers, CMake >=3.20, Python >=3.11, Git, R >=4.1 and rustup.
+<details>
+<summary><b>Using the C library directly</b></summary>
 
-```sh
-make setup JOBS=4
-make release
-.deps/duckdb-build/duckdb -unsigned -no-init
-```
+The build also produces `build/libsassy_c.a`.
+[include/sassy_c.h](include/sassy_c.h) defines its ABI, ownership rules and
+limits; [test/c/test_abi.c](test/c/test_abi.c) is a working example.
 
-On upgrades, move an outdated `.deps/sassy-source` checkout aside before rerunning
-`make setup`.
-
-In that CLI:
-
-```sql
-SET GLOBAL lambda_syntax='ENABLE_SINGLE_ARROW';
-INSTALL '.deps/duckhts.duckdb_extension';
-INSTALL 'build/ducksassy.duckdb_extension';
-.read sql/ducksassy.sql
-```
-
-The public macros are connection-scoped. The global lambda setting is required
-by DuckHTS 1.5.2 and affects all connections to that database instance, so use an
-isolated instance. Other v2 preview hosts may be ABI-incompatible; supported
-versions are listed in [ducksassy-package.json](ducksassy-package.json).
-
-The build also produces `build/libsassy_c.a` for direct C callers.
-[include/sassy_c.h](include/sassy_c.h) defines its ABI, ownership and limits;
-[test/c/test_abi.c](test/c/test_abi.c) provides an example.
-
-## Benchmarks
-
-[FASTA, CRISPR and relational search results](benchmarks/sequence_search.md).
+</details>
 
 ## Development
 
@@ -241,12 +294,14 @@ The build also produces `build/libsassy_c.a` for direct C callers.
 make test sql-test oracle-test readme
 ```
 
-The CRISPR comparison covers 36 profiles, 864 guide/record pairs and complete hit
-multisets against the Sassy `r sassy_version` CLI. `make r-test` runs DBI integration with the
-R preview host listed in `ducksassy-package.json`; that host is installed
-separately under `.deps/Rlib/`.
+`oracle-test` compares complete CRISPR hit multisets against the Sassy
+`r sassy_version` CLI across 36 profiles and 864 guide/record pairs.
+`make r-test` runs DBI integration against the R preview host pinned in
+`ducksassy-package.json`, installed separately under `.deps/Rlib/`.
+`make benchmarks` re-renders the [benchmark report](benchmarks/sequence_search.md).
 
 ## Credits
 
-Sassy is by Rick Beeloo and Ragnar Groot Koerkamp. See its
-[MIT notice](third_party/sassy/LICENSE).
+[Sassy](https://github.com/RagnarGrootKoerkamp/sassy) is by Rick Beeloo and
+Ragnar Groot Koerkamp ([MIT](third_party/sassy/LICENSE)). File reading comes
+from [DuckHTS](https://github.com/RGenomicsETL/duckhts).
