@@ -4,20 +4,37 @@ Ducksassy sequence-search benchmarks
 ## Results
 
 Sassy **0.2.6**, Ducksassy
-**87653fda17a28498414b621bb1bd7a8aaea75ba4**, Intel Core i5-13500.
+**abe57778cf09199d87a8e0c739ed4190eb4f9d6a**, Intel Core i5-13500.
 Medians of seven measured queries after one warm-up; lower times are better.
 
 | workload   | threads | scalar_seconds | avx2_seconds | scalar_over_avx2 |
 |:-----------|--------:|---------------:|-------------:|-----------------:|
-| crispr     |       1 |          0.155 |        0.099 |            1.566 |
-| crispr     |       4 |          0.156 |        0.095 |            1.642 |
+| crispr     |       1 |          0.149 |        0.096 |            1.552 |
+| crispr     |       4 |          0.154 |        0.094 |            1.638 |
 | fasta      |       1 |          0.097 |        0.090 |            1.078 |
-| fasta      |       4 |          0.097 |        0.089 |            1.090 |
-| relational |       1 |          0.967 |        0.908 |            1.065 |
-| relational |       4 |          0.463 |        0.431 |            1.074 |
+| fasta      |       4 |          0.098 |        0.088 |            1.114 |
+| relational |       1 |          1.010 |        0.903 |            1.118 |
+| relational |       4 |          0.475 |        0.427 |            1.112 |
 
 The `scalar` backend includes SSE2 on x86-64.
 These are SQL end-to-end measurements, not isolated kernel timings.
+
+## Upstream Sassy CLI baseline
+
+The upstream CLI searches the same FASTA and eight guides with the same CRISPR
+options, one thread and CPU 19. Every timed run is checked against the complete
+hit multiset. Both baseline builds use Sassy’s scalar feature (SSE2 on x86-64).
+
+| upstream_cli_seconds | ducksassy_sql_seconds | sql_over_cli |
+|---------------------:|----------------------:|-------------:|
+|                0.148 |                 0.149 |        1.007 |
+
+This ratio compares two complete application paths. Upstream includes process
+startup and writing TSV; Ducksassy uses a persistent session and aggregates every
+hit. Both include FASTA reading and searching. The difference includes those
+execution and output choices, so it does not isolate the C adapter’s cost. Upstream
+TSV parsing and result validation happen outside its timer. A library-only timing
+would be needed to isolate the cost of validation, FFI and DuckDB result building.
 
 ## Workloads
 
@@ -59,24 +76,28 @@ DuckDB is configured for one thread on CPU **19**, or four threads on CPUs
 reported separately from DuckDB’s query-thread setting. A single-record FASTA
 does not supply four independent search tasks.
 
-| requested | threads | cpus  | observed_thread_count | all_thread_affinities_match | name   | compiled | supported | selected |
-|:----------|--------:|:------|----------------------:|:----------------------------|:-------|:---------|:----------|:---------|
-| scalar    |       1 | 19    |                    81 | TRUE                        | avx2   | TRUE     | TRUE      | FALSE    |
-| scalar    |       1 | 19    |                    81 | TRUE                        | avx512 | TRUE     | FALSE     | FALSE    |
-| scalar    |       1 | 19    |                    81 | TRUE                        | neon   | FALSE    | FALSE     | FALSE    |
-| scalar    |       1 | 19    |                    81 | TRUE                        | scalar | TRUE     | TRUE      | TRUE     |
-| scalar    |       4 | 16-19 |                    84 | TRUE                        | avx2   | TRUE     | TRUE      | FALSE    |
-| scalar    |       4 | 16-19 |                    84 | TRUE                        | avx512 | TRUE     | FALSE     | FALSE    |
-| scalar    |       4 | 16-19 |                    84 | TRUE                        | neon   | FALSE    | FALSE     | FALSE    |
-| scalar    |       4 | 16-19 |                    84 | TRUE                        | scalar | TRUE     | TRUE      | TRUE     |
-| avx2      |       1 | 19    |                    81 | TRUE                        | avx2   | TRUE     | TRUE      | TRUE     |
-| avx2      |       1 | 19    |                    81 | TRUE                        | avx512 | TRUE     | FALSE     | FALSE    |
-| avx2      |       1 | 19    |                    81 | TRUE                        | neon   | FALSE    | FALSE     | FALSE    |
-| avx2      |       1 | 19    |                    81 | TRUE                        | scalar | TRUE     | TRUE      | FALSE    |
-| avx2      |       4 | 16-19 |                    84 | TRUE                        | avx2   | TRUE     | TRUE      | TRUE     |
-| avx2      |       4 | 16-19 |                    84 | TRUE                        | avx512 | TRUE     | FALSE     | FALSE    |
-| avx2      |       4 | 16-19 |                    84 | TRUE                        | neon   | FALSE    | FALSE     | FALSE    |
-| avx2      |       4 | 16-19 |                    84 | TRUE                        | scalar | TRUE     | TRUE      | FALSE    |
+| requested | threads | cpus  | observed_thread_count | all_thread_affinities_match | name    | compiled | supported | selected |
+|:----------|--------:|:------|----------------------:|:----------------------------|:--------|:---------|:----------|:---------|
+| scalar    |       1 | 19    |                    81 | TRUE                        | avx2    | TRUE     | TRUE      | FALSE    |
+| scalar    |       1 | 19    |                    81 | TRUE                        | avx512  | TRUE     | FALSE     | FALSE    |
+| scalar    |       1 | 19    |                    81 | TRUE                        | neon    | FALSE    | FALSE     | FALSE    |
+| scalar    |       1 | 19    |                    81 | TRUE                        | scalar  | TRUE     | TRUE      | TRUE     |
+| scalar    |       1 | 19    |                    81 | TRUE                        | wasm128 | FALSE    | FALSE     | FALSE    |
+| scalar    |       4 | 16-19 |                    84 | TRUE                        | avx2    | TRUE     | TRUE      | FALSE    |
+| scalar    |       4 | 16-19 |                    84 | TRUE                        | avx512  | TRUE     | FALSE     | FALSE    |
+| scalar    |       4 | 16-19 |                    84 | TRUE                        | neon    | FALSE    | FALSE     | FALSE    |
+| scalar    |       4 | 16-19 |                    84 | TRUE                        | scalar  | TRUE     | TRUE      | TRUE     |
+| scalar    |       4 | 16-19 |                    84 | TRUE                        | wasm128 | FALSE    | FALSE     | FALSE    |
+| avx2      |       1 | 19    |                    81 | TRUE                        | avx2    | TRUE     | TRUE      | TRUE     |
+| avx2      |       1 | 19    |                    81 | TRUE                        | avx512  | TRUE     | FALSE     | FALSE    |
+| avx2      |       1 | 19    |                    81 | TRUE                        | neon    | FALSE    | FALSE     | FALSE    |
+| avx2      |       1 | 19    |                    81 | TRUE                        | scalar  | TRUE     | TRUE      | FALSE    |
+| avx2      |       1 | 19    |                    81 | TRUE                        | wasm128 | FALSE    | FALSE     | FALSE    |
+| avx2      |       4 | 16-19 |                    84 | TRUE                        | avx2    | TRUE     | TRUE      | TRUE     |
+| avx2      |       4 | 16-19 |                    84 | TRUE                        | avx512  | TRUE     | FALSE     | FALSE    |
+| avx2      |       4 | 16-19 |                    84 | TRUE                        | neon    | FALSE    | FALSE     | FALSE    |
+| avx2      |       4 | 16-19 |                    84 | TRUE                        | scalar  | TRUE     | TRUE      | FALSE    |
+| avx2      |       4 | 16-19 |                    84 | TRUE                        | wasm128 | FALSE    | FALSE     | FALSE    |
 
 ## Correctness checks
 
@@ -92,10 +113,7 @@ guide, record, cost, strand, start, end and CIGAR. Every constructed relational
 row also contains the independently known exact hit `[64,87)`, `+`, `23=`;
 that is checked at `k=0` before timing. The `k=2` fingerprints detect backend/thread
 inconsistencies, not independent biological correctness. No disagreements are
-filtered out. The upstream CLI is a correctness oracle here, not a timed
-performance baseline. It starts a process and writes TSV; the timed DuckDB
-queries use persistent sessions and aggregate all hits. No cross-tool speed
-ratio is claimed.
+filtered out.
 
 ## Input preparation and reproduction
 
@@ -113,13 +131,14 @@ make benchmarks
 Requires Linux `taskset`, CPUs 16–19 in the allowed affinity set, and AVX2/POPCNT.
 
 - [Raw timings](data/sequence_search_0.2.6/timings.csv)
+- [Upstream CLI timings](data/sequence_search_0.2.6/upstream_timings.csv)
 - [Backend observations](data/sequence_search_0.2.6/backends.csv)
 - [Validation counts](data/sequence_search_0.2.6/oracle.csv)
 - [Artifact, input, compiler and runtime receipt](data/sequence_search_0.2.6/receipt.json)
 - [Query templates](data/sequence_search_0.2.6/queries.sql)
 - [Driver](sequence_search.R)
 
-Extension SHA-256: 7ae010f8547e09630d8c361b41df5d0e9e4610597def93fe3671b0a627394214.
+Extension SHA-256: d798e10a27311841dbc8a36c941ae2185b1acaf247f0c2963ce92800194ebb95.
 
 FASTA SHA-256: a0ca3984234be9bd174e1f4691f062cc2a1a7dc24fb5c76b7d2f523f79f0c27c;
 4699686 bytes.
