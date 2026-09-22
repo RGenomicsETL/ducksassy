@@ -1,0 +1,213 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+# comm: duckdb
+#
+# Total Lost Samples: 0
+#
+# Samples: 13K of event 'cpu-clock:u'
+# Event count (approx.): 54614454336
+#
+# Overhead  Shared Object  Symbol
+# ........  .............  .....................................
+#
+     1.50%  libc.so.6      [.] pthread_mutex_unlock@@GLIBC_2.2.5
+            |
+            |--1.49%--_start
+            |          __libc_start_main_impl (inlined)
+            |          __libc_start_call_main
+            |          main
+            |          RunShell(int, char const**)
+            |          duckdb_shell::ShellState::ProcessInput(duckdb_shell::InputMode)
+            |          duckdb_shell::ShellState::RunOneSqlLine(duckdb_shell::InputMode, char*)
+            |          duckdb_shell::ShellState::ExecuteSQL(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+            |          duckdb_shell::ShellState::ExecuteStatement(duckdb::unique_ptr<duckdb::SQLStatement, std::default_delete<duckdb::SQLStatement>, true>)
+            |          duckdb_shell::ShellState::RenderQueryResult(duckdb_shell::ShellRenderer&, duckdb::QueryResultStream&, duckdb_shell::PagerMode)
+            |          duckdb_shell::ShellState::RenderPreparedResult(duckdb_shell::ShellRenderer&, duckdb_shell::RenderingQueryResult&, duckdb_shell::PagerMode)
+            |          duckdb_shell::ShellRenderer::RenderQueryResult(duckdb_shell::PrintStream&, duckdb_shell::ShellState&, duckdb_shell::RenderingQueryResult&)
+            |          duckdb_shell::RenderingResultIterator::RenderingResultIterator(duckdb::optional_ptr<duckdb_shell::RenderingQueryResult, true>)
+            |          duckdb_shell::RenderingQueryResult::TryConvertChunk()
+            |          duckdb::QueryResultStream::Fetch()
+            |          duckdb::QueryResultStream::FetchInternal(duckdb::ClientContextLock&)
+            |          duckdb::BufferedData::ReplenishBuffer(duckdb::ClientContextLock&, duckdb::QueryResult&)
+            |          duckdb::BufferedData::Participate(duckdb::ClientContextLock&, duckdb::QueryResult&)
+            |          |
+            |          |--0.65%--duckdb::SimpleBufferedData::BufferSaturated()
+            |          |          ___pthread_mutex_unlock (inlined)
+            |          |          |
+            |          |           --0.63%--__GI___pthread_mutex_unlock_usercnt (inlined)
+            |          |                     |
+            |          |                      --0.57%--lll_mutex_unlock_optimized (inlined)
+            |          |
+            |          |--0.57%--duckdb::ClientContext::ExecuteTaskInternal(duckdb::ClientContextLock&, duckdb::BaseQueryResult&)
+            |          |          |
+            |          |          |--0.32%--duckdb::Executor::IdleState()
+            |          |          |          ___pthread_mutex_unlock (inlined)
+            |          |          |          __GI___pthread_mutex_unlock_usercnt (inlined)
+            |          |          |          |
+            |          |          |           --0.28%--lll_mutex_unlock_optimized (inlined)
+            |          |          |
+            |          |           --0.25%--duckdb::Executor::ExecuteTask()
+            |          |                     duckdb::TaskScheduler::GetTaskFromProducer(duckdb::ProducerToken&, duckdb::shared_ptr<duckdb::Task, true>&)
+            |          |                     ___pthread_mutex_unlock (inlined)
+            |          |                     __GI___pthread_mutex_unlock_usercnt (inlined)
+            |          |                     |
+            |          |                      --0.24%--lll_mutex_unlock_optimized (inlined)
+            |          |
+            |           --0.26%--duckdb::SimpleBufferedData::UnblockSinks()
+            |                     ___pthread_mutex_unlock (inlined)
+            |                     __GI___pthread_mutex_unlock_usercnt (inlined)
+            |                     |
+            |                      --0.22%--lll_mutex_unlock_optimized (inlined)
+            |
+             --0.01%--clone3
+                       start_thread
+                       0x714c9eeecdb3
+                       duckdb::TaskScheduler::ExecuteForever(std::atomic<bool>*, duckdb::TaskSchedulerType)
+                       duckdb::TaskScheduler::TryDequeueAndProcessTask(duckdb::DBConfig const&, duckdb::TaskSchedulerQueue&, duckdb::shared_ptr<duckdb::Task, true>&)
+                       duckdb::ExecutorTask::Execute(duckdb::TaskExecutionMode)
+                       duckdb::PipelineTask::ExecuteTask(duckdb::TaskExecutionMode)
+                       duckdb::PipelineExecutor::Execute(unsigned long)
+                       duckdb::PipelineExecutor::FetchFromSource(duckdb::DataChunk&)
+                       duckdb::PhysicalTableScan::GetDataInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::OperatorSourceInput&) const
+                       duckdb::DuckTableScanState::TableScanFunc(duckdb::ClientContext&, duckdb::TableFunctionInput&, duckdb::DataChunk&)
+                       duckdb::CollectionScanState::ProcessPreparedScan(duckdb::DuckTransaction&, duckdb::DataChunk&)
+                       duckdb::RowGroup::ProcessPreparedScan(duckdb::ScanOptions, duckdb::CollectionScanState&, duckdb::DataChunk&)
+                       duckdb::StandardColumnData::Scan(duckdb::TransactionData, unsigned long, duckdb::ColumnScanState&, duckdb::Vector&, unsigned long)
+                       duckdb::ColumnData::ScanVector(duckdb::TransactionData, unsigned long, duckdb::ColumnScanState&, duckdb::Vector&, unsigned long, duckdb::ScanVectorType, duckdb::UpdateScanType)
+                       duckdb::ColumnData::ScanVector(duckdb::ColumnScanState&, duckdb::Vector&, unsigned long, duckdb::ScanVectorType, unsigned long)
+                       duckdb::ColumnSegment::InitializeScan(duckdb::ColumnScanState&)
+                       duckdb::UncompressedStringStorage::StringInitScan(duckdb::QueryContext const&, duckdb::ColumnSegment&)
+                       duckdb::StandardBufferManager::Pin(duckdb::QueryContext const&, duckdb::shared_ptr<duckdb::BlockHandle, true>&)
+                       std::unique_lock<std::mutex>::unlock()
+                       ___pthread_mutex_unlock (inlined)
+                       __GI___pthread_mutex_unlock_usercnt (inlined)
+                       lll_mutex_unlock_optimized (inlined)
+
+     1.42%  libc.so.6      [.] pthread_mutex_lock@@GLIBC_2.2.5
+            |
+            |--1.41%--_start
+            |          __libc_start_main_impl (inlined)
+            |          __libc_start_call_main
+            |          main
+            |          RunShell(int, char const**)
+            |          duckdb_shell::ShellState::ProcessInput(duckdb_shell::InputMode)
+            |          duckdb_shell::ShellState::RunOneSqlLine(duckdb_shell::InputMode, char*)
+            |          duckdb_shell::ShellState::ExecuteSQL(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+            |          duckdb_shell::ShellState::ExecuteStatement(duckdb::unique_ptr<duckdb::SQLStatement, std::default_delete<duckdb::SQLStatement>, true>)
+            |          duckdb_shell::ShellState::RenderQueryResult(duckdb_shell::ShellRenderer&, duckdb::QueryResultStream&, duckdb_shell::PagerMode)
+            |          duckdb_shell::ShellState::RenderPreparedResult(duckdb_shell::ShellRenderer&, duckdb_shell::RenderingQueryResult&, duckdb_shell::PagerMode)
+            |          duckdb_shell::ShellRenderer::RenderQueryResult(duckdb_shell::PrintStream&, duckdb_shell::ShellState&, duckdb_shell::RenderingQueryResult&)
+            |          duckdb_shell::RenderingResultIterator::RenderingResultIterator(duckdb::optional_ptr<duckdb_shell::RenderingQueryResult, true>)
+            |          duckdb_shell::RenderingQueryResult::TryConvertChunk()
+            |          duckdb::QueryResultStream::Fetch()
+            |          duckdb::QueryResultStream::FetchInternal(duckdb::ClientContextLock&)
+            |          duckdb::BufferedData::ReplenishBuffer(duckdb::ClientContextLock&, duckdb::QueryResult&)
+            |          duckdb::BufferedData::Participate(duckdb::ClientContextLock&, duckdb::QueryResult&)
+            |          |
+            |          |--0.60%--duckdb::ClientContext::ExecuteTaskInternal(duckdb::ClientContextLock&, duckdb::BaseQueryResult&)
+            |          |          |
+            |          |          |--0.30%--duckdb::Executor::ExecuteTask()
+            |          |          |          duckdb::TaskScheduler::GetTaskFromProducer(duckdb::ProducerToken&, duckdb::shared_ptr<duckdb::Task, true>&)
+            |          |          |          ___pthread_mutex_lock (inlined)
+            |          |          |          |
+            |          |          |           --0.27%--lll_mutex_lock_optimized (inlined)
+            |          |          |
+            |          |           --0.29%--duckdb::Executor::IdleState()
+            |          |                     ___pthread_mutex_lock (inlined)
+            |          |                     |
+            |          |                      --0.26%--lll_mutex_lock_optimized (inlined)
+            |          |
+            |          |--0.55%--duckdb::SimpleBufferedData::BufferSaturated()
+            |          |          ___pthread_mutex_lock (inlined)
+            |          |          |
+            |          |           --0.43%--lll_mutex_lock_optimized (inlined)
+            |          |
+            |           --0.26%--duckdb::SimpleBufferedData::UnblockSinks()
+            |                     ___pthread_mutex_lock (inlined)
+            |                     |
+            |                      --0.21%--lll_mutex_lock_optimized (inlined)
+            |
+             --0.01%--clone3
+                       start_thread
+                       0x714c9eeecdb3
+                       duckdb::TaskScheduler::ExecuteForever(std::atomic<bool>*, duckdb::TaskSchedulerType)
+                       duckdb::TaskScheduler::TryDequeueAndProcessTask(duckdb::DBConfig const&, duckdb::TaskSchedulerQueue&, duckdb::shared_ptr<duckdb::Task, true>&)
+                       duckdb::ExecutorTask::Execute(duckdb::TaskExecutionMode)
+                       duckdb::PipelineTask::ExecuteTask(duckdb::TaskExecutionMode)
+                       duckdb::PipelineExecutor::Execute(unsigned long)
+                       duckdb::PipelineExecutor::FetchFromSource(duckdb::DataChunk&)
+                       duckdb::PhysicalTableScan::GetDataInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::OperatorSourceInput&) const
+                       duckdb::DuckTableScanState::TableScanFunc(duckdb::ClientContext&, duckdb::TableFunctionInput&, duckdb::DataChunk&)
+                       duckdb::CollectionScanState::ProcessPreparedScan(duckdb::DuckTransaction&, duckdb::DataChunk&)
+                       duckdb::RowGroup::ProcessPreparedScan(duckdb::ScanOptions, duckdb::CollectionScanState&, duckdb::DataChunk&)
+                       duckdb::StandardColumnData::Scan(duckdb::TransactionData, unsigned long, duckdb::ColumnScanState&, duckdb::Vector&, unsigned long)
+                       duckdb::ColumnData::ScanVector(duckdb::TransactionData, unsigned long, duckdb::ColumnScanState&, duckdb::Vector&, unsigned long, duckdb::ScanVectorType, duckdb::UpdateScanType)
+                       duckdb::ColumnData::ScanVector(duckdb::ColumnScanState&, duckdb::Vector&, unsigned long, duckdb::ScanVectorType, unsigned long)
+                       duckdb::ColumnSegment::InitializeScan(duckdb::ColumnScanState&)
+                       duckdb::UncompressedStringStorage::StringInitScan(duckdb::QueryContext const&, duckdb::ColumnSegment&)
+                       duckdb::StandardBufferManager::Pin(duckdb::QueryContext const&, duckdb::shared_ptr<duckdb::BlockHandle, true>&)
+                       ___pthread_mutex_lock (inlined)
+
+     0.03%  duckdb         [.] pthread_mutex_lock@plt
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               __libc_start_call_main
+               main
+               RunShell(int, char const**)
+               duckdb_shell::ShellState::ProcessInput(duckdb_shell::InputMode)
+               duckdb_shell::ShellState::RunOneSqlLine(duckdb_shell::InputMode, char*)
+               duckdb_shell::ShellState::ExecuteSQL(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+               duckdb_shell::ShellState::ExecuteStatement(duckdb::unique_ptr<duckdb::SQLStatement, std::default_delete<duckdb::SQLStatement>, true>)
+               duckdb_shell::ShellState::RenderQueryResult(duckdb_shell::ShellRenderer&, duckdb::QueryResultStream&, duckdb_shell::PagerMode)
+               duckdb_shell::ShellState::RenderPreparedResult(duckdb_shell::ShellRenderer&, duckdb_shell::RenderingQueryResult&, duckdb_shell::PagerMode)
+               duckdb_shell::ShellRenderer::RenderQueryResult(duckdb_shell::PrintStream&, duckdb_shell::ShellState&, duckdb_shell::RenderingQueryResult&)
+               duckdb_shell::RenderingResultIterator::RenderingResultIterator(duckdb::optional_ptr<duckdb_shell::RenderingQueryResult, true>)
+               duckdb_shell::RenderingQueryResult::TryConvertChunk()
+               duckdb::QueryResultStream::Fetch()
+               duckdb::QueryResultStream::FetchInternal(duckdb::ClientContextLock&)
+               duckdb::BufferedData::ReplenishBuffer(duckdb::ClientContextLock&, duckdb::QueryResult&)
+               duckdb::BufferedData::Participate(duckdb::ClientContextLock&, duckdb::QueryResult&)
+               |
+               |--0.02%--duckdb::ClientContext::ExecuteTaskInternal(duckdb::ClientContextLock&, duckdb::BaseQueryResult&)
+               |          |
+               |          |--0.01%--duckdb::Executor::IdleState()
+               |          |          pthread_mutex_lock@plt
+               |          |
+               |           --0.01%--duckdb::Executor::ExecuteTask()
+               |                     duckdb::TaskScheduler::GetTaskFromProducer(duckdb::ProducerToken&, duckdb::shared_ptr<duckdb::Task, true>&)
+               |                     pthread_mutex_lock@plt
+               |
+                --0.01%--duckdb::SimpleBufferedData::BufferSaturated()
+                          pthread_mutex_lock@plt
+
+     0.01%  duckdb         [.] pthread_mutex_unlock@plt
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               __libc_start_call_main
+               main
+               RunShell(int, char const**)
+               duckdb_shell::ShellState::ProcessInput(duckdb_shell::InputMode)
+               duckdb_shell::ShellState::RunOneSqlLine(duckdb_shell::InputMode, char*)
+               duckdb_shell::ShellState::ExecuteSQL(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+               duckdb_shell::ShellState::ExecuteStatement(duckdb::unique_ptr<duckdb::SQLStatement, std::default_delete<duckdb::SQLStatement>, true>)
+               duckdb_shell::ShellState::RenderQueryResult(duckdb_shell::ShellRenderer&, duckdb::QueryResultStream&, duckdb_shell::PagerMode)
+               duckdb_shell::ShellState::RenderPreparedResult(duckdb_shell::ShellRenderer&, duckdb_shell::RenderingQueryResult&, duckdb_shell::PagerMode)
+               duckdb_shell::ShellRenderer::RenderQueryResult(duckdb_shell::PrintStream&, duckdb_shell::ShellState&, duckdb_shell::RenderingQueryResult&)
+               duckdb_shell::RenderingResultIterator::RenderingResultIterator(duckdb::optional_ptr<duckdb_shell::RenderingQueryResult, true>)
+               duckdb_shell::RenderingQueryResult::TryConvertChunk()
+               duckdb::QueryResultStream::Fetch()
+               duckdb::QueryResultStream::FetchInternal(duckdb::ClientContextLock&)
+               duckdb::BufferedData::ReplenishBuffer(duckdb::ClientContextLock&, duckdb::QueryResult&)
+               duckdb::BufferedData::Participate(duckdb::ClientContextLock&, duckdb::QueryResult&)
+               duckdb::ClientContext::ExecuteTaskInternal(duckdb::ClientContextLock&, duckdb::BaseQueryResult&)
+               duckdb::Executor::ExecuteTask()
+               duckdb::TaskScheduler::GetTaskFromProducer(duckdb::ProducerToken&, duckdb::shared_ptr<duckdb::Task, true>&)
+               pthread_mutex_unlock@plt
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -1,0 +1,71 @@
+{
+  "source_revision": "92d49294692d3f64709927d89706cfa9c752c3c3",
+  "native_tree_clean": true,
+  "generated_at_utc": "2026-09-22T21:25:38.317698+00:00",
+  "artifacts_sha256": {
+    "build/ducksassy.duckdb_extension": "a629200a08d52d1d9e002add73a4a73768f3c745815b5ab5ac0e794e3ab30be9",
+    ".deps/duckdb-build/duckdb": "cc449920df344bcd56a8d71227ff9cf4debc9cad03c3003fb064a313840e8c6c",
+    "src/ducksassy.c": "fe1a3a6917e8d02b1365fba3c66699f5f1b5aa8d922e08dcedaff236b0266b3b",
+    "src/sassy_dispatch.c": "7171bd26e900a3fb12f17179ef050eb61d41126ce998cd162c335db68b877aee",
+    "rust/src/lib.rs": "a2e0f9f7e19888df597fb80b11179e3a79843f2781ba475d712012a6174b7eb5"
+  },
+  "reproduction_drivers_sha256": {
+    "benchmarks/profile_search.R": "58f2ba3ecea95ea926a2bd7750673eb90fb636eb2b029d5eae2f8fc4b8e1894d",
+    "benchmarks/profile_balanced.R": "4a02938af14f98114552e3b1c1071a34613b25045e4004b3dcc4d45f03bdcb06",
+    "benchmarks/summarize_profile.py": "39cc655f8c52c11b42aa4c6236019284756f3197514d8191dc4b7d53540627cb"
+  },
+  "profiles": {
+    "one": {
+      "frequency_hz": 499,
+      "stack_bytes": 16384,
+      "threads": 1,
+      "repetitions": 4,
+      "operation": "hits",
+      "data_sha256": "fe44425eeda6daa3177615b3f1a9c8667aa4f32ab95ad61be3e65238bb3c6ec5",
+      "local_data_path": "/tmp/ducksassy-profiling/one.data"
+    },
+    "eight": {
+      "frequency_hz": 249,
+      "stack_bytes": 8192,
+      "threads": 8,
+      "repetitions": 8,
+      "operation": "hits",
+      "data_sha256": "e36b44ac324ae3662d7fb060c65ec9da234a6d851a5105184bdf46c893c920c1",
+      "local_data_path": "/tmp/ducksassy-profiling/eight.data"
+    },
+    "ascii": {
+      "frequency_hz": 499,
+      "stack_bytes": 16384,
+      "threads": 1,
+      "repetitions": 6,
+      "operation": "ascii",
+      "data_sha256": "eeb99c232d59106df7a4b1ed04ee0843b931a0ff6572f18d109634c04ae4d8f9",
+      "local_data_path": "/tmp/ducksassy-profiling/ascii.data"
+    }
+  },
+  "perf_version": "perf version 6.8.12",
+  "cpu_topology": [
+    "CPU CORE SOCKET    MAXMHZ",
+    "  0    0      0 4800.0000",
+    "  1    0      0 4800.0000",
+    "  2    1      0 4800.0000",
+    "  3    1      0 4800.0000",
+    "  4    2      0 4800.0000",
+    "  5    2      0 4800.0000",
+    "  6    3      0 4800.0000",
+    "  7    3      0 4800.0000",
+    "  8    4      0 4800.0000",
+    "  9    4      0 4800.0000",
+    " 10    5      0 4800.0000",
+    " 11    5      0 4800.0000",
+    " 12    6      0 3500.0000",
+    " 13    7      0 3500.0000",
+    " 14    8      0 3500.0000",
+    " 15    9      0 3500.0000",
+    " 16   10      0 3500.0000",
+    " 17   11      0 3500.0000",
+    " 18   12      0 3500.0000",
+    " 19   13      0 3500.0000"
+  ],
+  "method": "perf cpu-clock:u, DWARF stacks, events enabled after input loading and warm-up using a FIFO; disabled after checked queries. Symbols limited to DuckDB threads. Native implementation unchanged. Timings collected separately without perf."
+}

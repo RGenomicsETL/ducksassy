@@ -1,0 +1,372 @@
+run,self_percent,samples,object,symbol,category
+one,64.22,8354,ducksassy.duckdb_extension,sassy::search::Searcher<P>::search_one_strand,sassy_search_traceback_encoding
+one,9.44,1228,ducksassy.duckdb_extension,sassy::search::MatchBatch::process,sassy_search_traceback_encoding
+one,2.82,367,libc.so.6,malloc,allocator
+one,2.55,332,libc.so.6,_int_free,allocator
+one,2.08,271,ducksassy.duckdb_extension,sassy_c::validate_alphabet,alphabet_validation
+one,1.96,255,ducksassy.duckdb_extension,scalar_exec,other
+one,1.38,180,libc.so.6,realloc,allocator
+one,1.18,154,libc.so.6,_int_malloc,allocator
+one,1.11,144,libc.so.6,cfree@GLIBC_2.2.5,allocator
+one,0.78,102,libc.so.6,__memmove_avx_unaligned_erms,copy_or_zero
+one,0.78,101,ducksassy.duckdb_extension,pa_types::cigar::Cigar::push,other
+one,0.77,100,ducksassy.duckdb_extension,sassy_c::sassy_c_search_many,other
+one,0.73,95,ducksassy.duckdb_extension,sassy_c::append_matches,other
+one,0.65,84,ducksassy.duckdb_extension,<sassy::profiles::dna::Dna as sassy::profiles::Profile>::encode_pattern,other
+one,0.53,69,ducksassy.duckdb_extension,sassy::search::Searcher<P>::search_handle_rc,sassy_search_traceback_encoding
+one,0.5,65,duckdb,"duckdb::UncompressedStringStorage::StringScanPartial(duckdb::ColumnSegment&, duckdb::ColumnScanState&, unsigned long, duckdb::Vector&, unsigned long)",other
+one,0.45,58,libc.so.6,__memset_avx2_unaligned_erms,copy_or_zero
+one,0.41,53,libc.so.6,_int_free_merge_chunk,allocator
+one,0.39,51,ducksassy.duckdb_extension,<pa_types::cigar::Cigar as alloc::string::ToString>::to_string,cigar_formatting
+one,0.39,51,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc14___rust_dealloc,other
+one,0.37,48,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc35___rust_no_alloc_shim_is_unstable_v2,other
+one,0.34,44,ducksassy.duckdb_extension,<sassy::profiles::dna::Dna as sassy::profiles::Profile>::complement,other
+one,0.34,44,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc12___rust_alloc,other
+one,0.33,43,libc.so.6,_int_realloc,allocator
+one,0.3,39,ducksassy.duckdb_extension,sassy_c::sassy_c_result_view,other
+one,0.27,35,duckdb,"duckdb::PhysicalUnnest::ExecuteInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::DataChunk&, duckdb::OperatorState&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&, bool)",other
+one,0.27,35,ducksassy.duckdb_extension,sassy_c::search_inputs,other
+one,0.26,34,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+one,0.25,32,duckdb,"void duckdb::ScalarFunction::UnaryFunction<duckdb::string_t, long, duckdb::(anonymous namespace)::StringLengthOperator>(duckdb::DataChunk&, duckdb::ExpressionState&, duckdb::Vector&)",other
+one,0.24,31,ducksassy.duckdb_extension,alloc::raw_vec::finish_grow,other
+one,0.21,27,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc11___rdl_alloc,other
+one,0.21,27,ducksassy.duckdb_extension,core::fmt::num::imp::<impl core::fmt::Display for i32>::fmt,cigar_formatting
+one,0.2,26,ducksassy.duckdb_extension,<&[u8] as alloc::ffi::c_str::CString::new::SpecNewImpl>::spec_new_impl,other
+one,0.18,23,libc.so.6,_int_free_maybe_consolidate,allocator
+one,0.17,22,ducksassy.duckdb_extension,sassy::search::MultiPattern::len,sassy_search_traceback_encoding
+one,0.16,21,ducksassy.duckdb_extension,sassy_c_result_view,other
+one,0.15,20,ducksassy.duckdb_extension,sassy::search::MatchBatch::add,sassy_search_traceback_encoding
+one,0.15,19,ducksassy.duckdb_extension,alloc::ffi::c_str::CString::_from_vec_unchecked,other
+one,0.13,17,ld-linux-x86-64.so.2,__tls_get_addr,other
+one,0.12,16,duckdb,"duckdb::UnnestOperatorState::PrepareInput(duckdb::DataChunk&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&)",other
+one,0.12,16,ducksassy.duckdb_extension,core::fmt::write,cigar_formatting
+one,0.12,16,libc.so.6,unlink_chunk.isra.0,other
+one,0.11,14,ducksassy.duckdb_extension,sassy_c_search_many,other
+one,0.09,12,duckdb,"duckdb::FlattenVectorBuffer(unsigned char*, unsigned char const*, duckdb::SelectionVector const&, unsigned long, unsigned long)",other
+one,0.08,11,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc13___rdl_realloc,allocator
+one,0.08,10,duckdb,"void duckdb::AggregateExecutor::ExecuteUnaryClustered<duckdb::SumState<duckdb::hugeint_t>, int, duckdb::(anonymous namespace)::SumToHugeintOperation>(duckdb::Vector&, duckdb::AggregateInputData&, duckdb::ClusteredAggr const&, unsigned long) [clone .isra.0]",other
+one,0.08,10,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc13___rdl_dealloc,other
+one,0.08,10,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+one,0.08,10,ducksassy.duckdb_extension,alloc::raw_vec::finish_grow,other
+one,0.07,9,duckdb,std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release(),other
+one,0.06,8,ducksassy.duckdb_extension,core::fmt::Formatter::pad_integral,cigar_formatting
+one,0.06,8,libc.so.6,pthread_once@GLIBC_2.2.5,pthread_once
+one,0.05,7,ducksassy.duckdb_extension,<alloc::string::String as core::fmt::Write>::write_char,cigar_formatting
+one,0.05,7,ducksassy.duckdb_extension,<alloc::string::String as core::fmt::Write>::write_str,cigar_formatting
+one,0.05,6,duckdb,"void duckdb::AggregateExecutor::ExecuteUnaryClustered<duckdb::SumState<duckdb::hugeint_t>, long, duckdb::(anonymous namespace)::SumToHugeintOperation>(duckdb::Vector&, duckdb::AggregateInputData&, duckdb::ClusteredAggr const&, unsigned long) [clone .isra.0]",other
+one,0.05,6,ducksassy.duckdb_extension,alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,other
+one,0.05,6,ducksassy.duckdb_extension,write_bytes,other
+one,0.04,5,ducksassy.duckdb_extension,<char as core::fmt::Display>::fmt,cigar_formatting
+one,0.04,5,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc14___rust_realloc,allocator
+one,0.03,4,ducksassy.duckdb_extension,alloc::vec::Vec$LT$T$C$A$GT$::retain::_$u7b$$u7b$closure$u7d$$u7d$::h3c0cdedd7a33ca83,other
+one,0.03,4,ducksassy.duckdb_extension,core::fmt::Formatter::pad_integral::write_prefix,cigar_formatting
+one,0.03,4,libc.so.6,memcpy@@GLIBC_2.14@plt,other
+one,0.02,3,duckdb,duckdb::VectorCacheEntry::ResetFromCache(duckdb::Vector&),other
+one,0.02,3,duckdb,duckdb::VectorStructBuffer::~VectorStructBuffer(),other
+one,0.02,3,duckdb,duckdb_v2_error_info_destroy,other
+one,0.02,3,ducksassy.duckdb_extension,sassy_c::sassy_c_result_free,other
+one,0.02,2,duckdb,"duckdb::StandardVectorBuffer::FlattenSliceInternal(duckdb::LogicalType const&, duckdb::SelectionVector const&, unsigned long) const",other
+one,0.02,2,duckdb,"duckdb::StandardVectorBuffer::SliceInternal(duckdb::LogicalType const&, duckdb::SelectionVector const&, unsigned long)",other
+one,0.02,2,duckdb,duckdb::Vector::ConstReference(duckdb::Vector const&) const,other
+one,0.02,2,ducksassy.duckdb_extension,pa_types::cigar::Cigar::reverse,other
+one,0.02,2,ducksassy.duckdb_extension,pthread_once@plt,pthread_once
+one,0.02,2,ducksassy.duckdb_extension,sassy_c_result_free,other
+one,0.01,1,duckdb,"duckdb::BlockHandle::Load(duckdb::QueryContext, duckdb::unique_ptr<duckdb::FileBuffer, std::default_delete<duckdb::FileBuffer>, true>)",other
+one,0.01,1,duckdb,"duckdb::ColumnData::GetVectorScanType(duckdb::ColumnScanState&, unsigned long, duckdb::Vector&)",other
+one,0.01,1,duckdb,"duckdb::DataChunk::VerifyInternal(duckdb::DebugVerificationMode, duckdb::optional_ptr<duckdb::DatabaseInstance, true>)",other
+one,0.01,1,duckdb,"duckdb::DictionaryBuffer::DictionaryBuffer(duckdb::SelectionVector const&, unsigned long, duckdb::shared_ptr<duckdb::DictionaryEntry, true>)",other
+one,0.01,1,duckdb,duckdb::DictionaryBuffer::ToUnifiedFormat(duckdb::UnifiedVectorFormat&) const,other
+one,0.01,1,duckdb,duckdb::DictionaryBuffer::~DictionaryBuffer(),other
+one,0.01,1,duckdb,duckdb::EvictionQueue::AddToEvictionQueue(duckdb::BufferEvictionNode&&),other
+one,0.01,1,duckdb,"duckdb::ExpressionExecutor::Execute(duckdb::BoundFunctionExpression const&, duckdb::ExpressionState*, duckdb::SelectionVector const*, unsigned long, duckdb::Vector&)",other
+one,0.01,1,duckdb,"duckdb::ExpressionExecutor::Execute(duckdb::DataChunk*, duckdb::DataChunk&)",other
+one,0.01,1,duckdb,"duckdb::ExpressionExecutor::Execute(duckdb::Expression const&, duckdb::ExpressionState*, duckdb::SelectionVector const*, unsigned long, duckdb::Vector&)",other
+one,0.01,1,duckdb,"duckdb::ExpressionExecutor::ExecuteExpression(unsigned long, duckdb::Vector&)",other
+one,0.01,1,duckdb,duckdb::ExpressionState::GetContext(),other
+one,0.01,1,duckdb,duckdb::GetTypeIdSize(duckdb::PhysicalType),other
+one,0.01,1,duckdb,duckdb::LogicalType::GetInternalType(),other
+one,0.01,1,duckdb,duckdb::LogicalType::LogicalType(duckdb::LogicalType&&),other
+one,0.01,1,duckdb,duckdb::LogicalType::~LogicalType(),other
+one,0.01,1,duckdb,"duckdb::PhysicalTableScan::GetDataInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::OperatorSourceInput&) const",other
+one,0.01,1,duckdb,"duckdb::RowGroup::GetSelVector(duckdb::ScanOptions, unsigned long, duckdb::SelectionVector&, unsigned long)",other
+one,0.01,1,duckdb,"duckdb::StandardBufferManager::Pin(duckdb::QueryContext const&, duckdb::shared_ptr<duckdb::BlockHandle, true>&)",other
+one,0.01,1,duckdb,duckdb::StandardVectorBuffer::~StandardVectorBuffer(),other
+one,0.01,1,duckdb,"duckdb::StructExtractFunction(duckdb::DataChunk&, duckdb::ExpressionState&, duckdb::Vector&)",other
+one,0.01,1,duckdb,"duckdb::UncompressedStringStorage::GetDictionaryEnd(duckdb::ColumnSegment&, duckdb::BufferHandle&)",other
+one,0.01,1,duckdb,"duckdb::ValidityMask::CopySel(duckdb::ValidityMask const&, duckdb::SelectionVector const&, unsigned long, unsigned long, unsigned long)",other
+one,0.01,1,duckdb,duckdb::ValidityMask::Resize(unsigned long),other
+one,0.01,1,duckdb,"duckdb::ValidityUncompressed::UnalignedScan(duckdb::array_ptr<unsigned long const, false>, unsigned long, unsigned long, duckdb::ValidityMask&, unsigned long, unsigned long)",other
+one,0.01,1,duckdb,"duckdb::VectorStringBuffer::SetValue(duckdb::LogicalType const&, unsigned long, duckdb::Value const&)",other
+one,0.01,1,duckdb,duckdb::VectorStructBuffer::SetVectorSize(unsigned long) [clone .cold],other
+one,0.01,1,duckdb,"duckdb::VectorStructBuffer::VectorStructBuffer(duckdb::VectorStructBuffer&, duckdb::SelectionVector const&, duckdb::count_t)",other
+one,0.01,1,duckdb,"duckdb::capiv2::CV2ScalarExec(duckdb::DataChunk&, duckdb::ExpressionState&, duckdb::Vector&)",other
+one,0.01,1,duckdb,duckdb_je_eset_fit,other
+one,0.01,1,duckdb,duckdb_je_te_recompute_fast_threshold,other
+one,0.01,1,duckdb,duckdb_v2_vector_flat_get_validity_mutable,other
+one,0.01,1,duckdb,duckdb_v2_vector_set_size,other
+one,0.01,1,ducksassy.duckdb_extension,__tls_get_addr@plt,other
+one,0.01,1,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+one,0.01,1,ducksassy.duckdb_extension,resize_hit_output,other
+one,0.01,1,libc.so.6,pthread_mutex_unlock@@GLIBC_2.2.5,mutex
+one,0.01,1,libstdc++.so.6.0.33,"operator delete(void*, unsigned long)",other
+one,0.01,1,libstdc++.so.6.0.33,"std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::reserve(unsigned long)",other
+eight,62.43,8490,ducksassy.duckdb_extension,sassy::search::Searcher<P>::search_one_strand,sassy_search_traceback_encoding
+eight,8.79,1195,ducksassy.duckdb_extension,sassy::search::MatchBatch::process,sassy_search_traceback_encoding
+eight,2.49,338,libc.so.6,_int_free,allocator
+eight,2.07,282,libc.so.6,malloc,allocator
+eight,1.69,230,ducksassy.duckdb_extension,sassy_c::validate_alphabet,alphabet_validation
+eight,1.59,216,libc.so.6,cfree@GLIBC_2.2.5,allocator
+eight,1.52,207,ducksassy.duckdb_extension,scalar_exec,other
+eight,1.5,204,libc.so.6,pthread_mutex_unlock@@GLIBC_2.2.5,mutex
+eight,1.44,196,libc.so.6,realloc,allocator
+eight,1.42,193,libc.so.6,pthread_mutex_lock@@GLIBC_2.2.5,mutex
+eight,0.86,117,duckdb,"duckdb::BufferedData::Participate(duckdb::ClientContextLock&, duckdb::QueryResult&)",other
+eight,0.8,109,ducksassy.duckdb_extension,pa_types::cigar::Cigar::push,other
+eight,0.74,100,ducksassy.duckdb_extension,sassy_c::append_matches,other
+eight,0.72,98,libc.so.6,__memmove_avx_unaligned_erms,copy_or_zero
+eight,0.71,97,libc.so.6,_int_malloc,allocator
+eight,0.65,89,duckdb,duckdb::SimpleBufferedData::UnblockSinks(),other
+eight,0.64,87,ducksassy.duckdb_extension,sassy_c::sassy_c_search_many,other
+eight,0.55,75,ducksassy.duckdb_extension,<sassy::profiles::dna::Dna as sassy::profiles::Profile>::encode_pattern,other
+eight,0.52,71,libc.so.6,__memset_avx2_unaligned_erms,copy_or_zero
+eight,0.48,65,duckdb,"duckdb::UncompressedStringStorage::StringScanPartial(duckdb::ColumnSegment&, duckdb::ColumnScanState&, unsigned long, duckdb::Vector&, unsigned long)",other
+eight,0.48,65,ducksassy.duckdb_extension,sassy::search::Searcher<P>::search_handle_rc,sassy_search_traceback_encoding
+eight,0.41,56,ducksassy.duckdb_extension,<pa_types::cigar::Cigar as alloc::string::ToString>::to_string,cigar_formatting
+eight,0.35,47,ducksassy.duckdb_extension,<sassy::profiles::dna::Dna as sassy::profiles::Profile>::complement,other
+eight,0.33,45,ducksassy.duckdb_extension,alloc::raw_vec::finish_grow,other
+eight,0.31,42,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc14___rust_dealloc,other
+eight,0.29,39,duckdb,"void duckdb::ScalarFunction::UnaryFunction<duckdb::string_t, long, duckdb::(anonymous namespace)::StringLengthOperator>(duckdb::DataChunk&, duckdb::ExpressionState&, duckdb::Vector&)",other
+eight,0.29,39,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+eight,0.27,37,ducksassy.duckdb_extension,sassy_c::search_inputs,other
+eight,0.26,36,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc35___rust_no_alloc_shim_is_unstable_v2,other
+eight,0.26,36,ducksassy.duckdb_extension,sassy_c::sassy_c_result_view,other
+eight,0.24,32,duckdb,"duckdb::PhysicalUnnest::ExecuteInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::DataChunk&, duckdb::OperatorState&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&, bool)",other
+eight,0.23,31,libc.so.6,_int_realloc,allocator
+eight,0.21,29,libc.so.6,_int_free_merge_chunk,allocator
+eight,0.2,27,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc12___rust_alloc,other
+eight,0.19,26,libc.so.6,unlink_chunk.isra.0,other
+eight,0.16,22,ducksassy.duckdb_extension,core::fmt::num::imp::<impl core::fmt::Display for i32>::fmt,cigar_formatting
+eight,0.16,22,ducksassy.duckdb_extension,core::fmt::write,cigar_formatting
+eight,0.15,21,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc11___rdl_alloc,other
+eight,0.15,21,ducksassy.duckdb_extension,sassy::search::MultiPattern::len,sassy_search_traceback_encoding
+eight,0.15,21,ld-linux-x86-64.so.2,__tls_get_addr,other
+eight,0.14,19,ducksassy.duckdb_extension,<&[u8] as alloc::ffi::c_str::CString::new::SpecNewImpl>::spec_new_impl,other
+eight,0.13,18,ducksassy.duckdb_extension,sassy::search::MatchBatch::add,sassy_search_traceback_encoding
+eight,0.13,17,ducksassy.duckdb_extension,alloc::ffi::c_str::CString::_from_vec_unchecked,other
+eight,0.13,17,ducksassy.duckdb_extension,sassy_c_result_view,other
+eight,0.13,17,libc.so.6,_int_free_maybe_consolidate,allocator
+eight,0.12,16,duckdb,"duckdb::TaskSchedulerQueue::DequeueFromProducerLocked(duckdb::ProducerToken&, duckdb::shared_ptr<duckdb::Task, true>&)",other
+eight,0.11,15,duckdb,"duckdb::UnnestOperatorState::PrepareInput(duckdb::DataChunk&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&)",other
+eight,0.1,13,ducksassy.duckdb_extension,alloc::raw_vec::finish_grow,other
+eight,0.1,13,ducksassy.duckdb_extension,core::fmt::Formatter::pad_integral,cigar_formatting
+eight,0.09,12,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc13___rdl_realloc,allocator
+eight,0.08,11,duckdb,duckdb::Executor::ExecuteTask(),other
+eight,0.08,11,duckdb,"duckdb::FlattenVectorBuffer(unsigned char*, unsigned char const*, duckdb::SelectionVector const&, unsigned long, unsigned long)",other
+eight,0.08,11,duckdb,duckdb::SimpleBufferedData::BufferSaturated(),other
+eight,0.08,11,duckdb,"duckdb::TaskScheduler::GetTaskFromProducerLocked(duckdb::ProducerToken&, duckdb::shared_ptr<duckdb::Task, true>&)",other
+eight,0.07,9,duckdb,"duckdb::ValidityMask::CopySel(duckdb::ValidityMask const&, duckdb::SelectionVector const&, unsigned long, unsigned long, unsigned long)",other
+eight,0.07,9,duckdb,"void duckdb::AggregateExecutor::ExecuteUnaryClustered<duckdb::SumState<duckdb::hugeint_t>, int, duckdb::(anonymous namespace)::SumToHugeintOperation>(duckdb::Vector&, duckdb::AggregateInputData&, duckdb::ClusteredAggr const&, unsigned long) [clone .isra.0]",other
+eight,0.07,9,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+eight,0.06,8,duckdb,"void duckdb::AggregateExecutor::ExecuteUnaryClustered<duckdb::SumState<duckdb::hugeint_t>, long, duckdb::(anonymous namespace)::SumToHugeintOperation>(duckdb::Vector&, duckdb::AggregateInputData&, duckdb::ClusteredAggr const&, unsigned long) [clone .isra.0]",other
+eight,0.06,8,ducksassy.duckdb_extension,alloc::vec::Vec$LT$T$C$A$GT$::retain::_$u7b$$u7b$closure$u7d$$u7d$::h3c0cdedd7a33ca83,other
+eight,0.05,7,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+eight,0.05,7,ducksassy.duckdb_extension,sassy_c_search_many,other
+eight,0.04,6,duckdb,"duckdb::ClientContext::ExecuteTaskInternal(duckdb::ClientContextLock&, duckdb::BaseQueryResult&)",other
+eight,0.04,6,duckdb,duckdb::ClientContext::UpdateProgressInternal(duckdb::QueryResultState),other
+eight,0.04,6,ducksassy.duckdb_extension,<alloc::string::String as core::fmt::Write>::write_str,cigar_formatting
+eight,0.04,6,ducksassy.duckdb_extension,sassy_c::sassy_c_result_free,other
+eight,0.04,6,ducksassy.duckdb_extension,sassy_c_result_free,other
+eight,0.04,5,duckdb,duckdb::BufferedData::Decide(duckdb::ResultLifetime),other
+eight,0.04,5,duckdb,duckdb::Executor::IdleState(),other
+eight,0.04,5,duckdb,"duckdb::SimpleBufferedData::CollectRestartableSinks(duckdb::annotated_lock_guard<duckdb::annotated_mutex>&, duckdb::vector<duckdb::BlockedSink, true, std::allocator<duckdb::BlockedSink> >&)",other
+eight,0.04,5,duckdb,"duckdb::TaskScheduler::GetTaskFromProducer(duckdb::ProducerToken&, duckdb::shared_ptr<duckdb::Task, true>&)",other
+eight,0.04,5,ducksassy.duckdb_extension,<char as core::fmt::Display>::fmt,cigar_formatting
+eight,0.04,5,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc13___rdl_dealloc,other
+eight,0.04,5,ducksassy.duckdb_extension,alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,other
+eight,0.04,5,ducksassy.duckdb_extension,pa_types::cigar::Cigar::reverse,other
+eight,0.03,4,duckdb,duckdb::BufferedData::DecideDraining(),other
+eight,0.03,4,duckdb,duckdb::TaskScheduler::GetScheduler(duckdb::ClientContext&),other
+eight,0.03,4,duckdb,duckdb_v2_error_info_destroy,other
+eight,0.03,4,duckdb,pthread_mutex_lock@plt,mutex
+eight,0.03,4,ducksassy.duckdb_extension,<alloc::string::String as core::fmt::Write>::write_char,cigar_formatting
+eight,0.03,4,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc14___rust_realloc,allocator
+eight,0.03,4,ducksassy.duckdb_extension,core::fmt::Formatter::pad_integral::write_prefix,cigar_formatting
+eight,0.03,4,ducksassy.duckdb_extension,write_bytes,other
+eight,0.03,4,libc.so.6,pthread_once@GLIBC_2.2.5,pthread_once
+eight,0.02,3,duckdb,"duckdb::ClientContext::IsActiveResult(duckdb::ClientContextLock&, duckdb::BaseQueryResult&)",other
+eight,0.02,3,duckdb,duckdb::SimpleBufferedData::ReplenishSatisfied(),other
+eight,0.02,3,duckdb,duckdb::StandardVectorBuffer::ResetCapacity(unsigned long),other
+eight,0.02,3,duckdb,std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release(),other
+eight,0.01,2,duckdb,duckdb::ClientContext::IsInterrupted() const,other
+eight,0.01,2,duckdb,duckdb::DatabaseInstance::GetScheduler(),other
+eight,0.01,2,duckdb,duckdb::Executor::HasError(),other
+eight,0.01,2,duckdb,"duckdb::PipelineExecutor::Execute(duckdb::DataChunk&, duckdb::DataChunk&, unsigned long)",other
+eight,0.01,2,duckdb,duckdb::ProducerToken::GetQueueProducerToken(duckdb::TaskSchedulerType),other
+eight,0.01,2,duckdb,duckdb::VectorCacheEntry::ResetFromCache(duckdb::Vector&),other
+eight,0.01,2,duckdb,"void duckdb::shared_ptr<duckdb::StandardVectorBuffer, true>::__enable_weak_this<duckdb::VectorBuffer, duckdb::StandardVectorBuffer, 0>(duckdb::enable_shared_from_this<duckdb::VectorBuffer> const*, duckdb::StandardVectorBuffer*) [clone .part.0]",other
+eight,0.01,1,duckdb,duckdb::Allocator::AllocateData(unsigned long),other
+eight,0.01,1,duckdb,"duckdb::Allocator::DefaultAllocate(duckdb::PrivateAllocatorData*, unsigned long)",other
+eight,0.01,1,duckdb,duckdb::AuxiliaryDataSetHolder::~AuxiliaryDataSetHolder(),other
+eight,0.01,1,duckdb,"duckdb::BlockHandle::Load(duckdb::QueryContext, duckdb::unique_ptr<duckdb::FileBuffer, std::default_delete<duckdb::FileBuffer>, true>)",other
+eight,0.01,1,duckdb,"duckdb::BufferedData::ReplenishBuffer(duckdb::ClientContextLock&, duckdb::QueryResult&)",other
+eight,0.01,1,duckdb,"duckdb::DataChunk::Initialize(duckdb::Allocator&, duckdb::vector<duckdb::LogicalType, true, std::allocator<duckdb::LogicalType> > const&, duckdb::vector<bool, true, std::allocator<bool> > const&, unsigned long)",other
+eight,0.01,1,duckdb,duckdb::DataChunk::SetChildCardinality(unsigned long),other
+eight,0.01,1,duckdb,duckdb::DatabaseInstance::GetDatabase(duckdb::ClientContext&),other
+eight,0.01,1,duckdb,"duckdb::DictionaryBuffer::DictionaryBuffer(duckdb::SelectionVector const&, unsigned long, duckdb::shared_ptr<duckdb::DictionaryEntry, true>)",other
+eight,0.01,1,duckdb,"duckdb::DuckTableScanState::TableScanFunc(duckdb::ClientContext&, duckdb::TableFunctionInput&, duckdb::DataChunk&)",other
+eight,0.01,1,duckdb,"duckdb::ExpressionExecutor::Execute(duckdb::BoundFunctionExpression const&, duckdb::ExpressionState*, duckdb::SelectionVector const*, unsigned long, duckdb::Vector&)",other
+eight,0.01,1,duckdb,duckdb::Function::Function(duckdb::Identifier),other
+eight,0.01,1,duckdb,duckdb::MatchStack::ExecuteFrame(duckdb::MatchStackFrame&),other
+eight,0.01,1,duckdb,"duckdb::ParserPackratCache::Store(duckdb::Matcher const&, unsigned long, duckdb::ParserPackratEntry)",other
+eight,0.01,1,duckdb,"duckdb::PipelineExecutor::GoToSource(unsigned long&, unsigned long)",other
+eight,0.01,1,duckdb,duckdb::QueryResult::Close(),other
+eight,0.01,1,duckdb,duckdb::RowGroup::HasUnloadedDeletes() const,other
+eight,0.01,1,duckdb,"duckdb::RowGroup::RegisterScanIO(duckdb::CollectionScanState&, unsigned long, duckdb::PrefetchState&) const",other
+eight,0.01,1,duckdb,"duckdb::SimpleBufferedData::InvokeUnblocks(duckdb::vector<duckdb::BlockedSink, true, std::allocator<duckdb::BlockedSink> > const&)",other
+eight,0.01,1,duckdb,"duckdb::StandardVectorBuffer::SliceInternal(duckdb::LogicalType const&, duckdb::SelectionVector const&, unsigned long)",other
+eight,0.01,1,duckdb,duckdb::StringValue::Get[abi:cxx11](duckdb::Value const&),other
+eight,0.01,1,duckdb,"duckdb::StructExtractFunction(duckdb::DataChunk&, duckdb::ExpressionState&, duckdb::Vector&)",other
+eight,0.01,1,duckdb,duckdb::StructVector::GetEntries(duckdb::Vector&),other
+eight,0.01,1,duckdb,"duckdb::UncompressedStringStorage::GetDictionaryEnd(duckdb::ColumnSegment&, duckdb::BufferHandle&)",other
+eight,0.01,1,duckdb,duckdb::ValidityMask::Resize(unsigned long),other
+eight,0.01,1,duckdb,"duckdb::ValidityUncompressed::UnalignedScan(duckdb::array_ptr<unsigned long const, false>, unsigned long, unsigned long, duckdb::ValidityMask&, unsigned long, unsigned long)",other
+eight,0.01,1,duckdb,duckdb::Vector::ConstReference(duckdb::Vector const&) const,other
+eight,0.01,1,duckdb,duckdb::Vector::Reserve(unsigned long),other
+eight,0.01,1,duckdb,duckdb::VectorBuffer::ClearAuxiliaryData(),other
+eight,0.01,1,duckdb,"duckdb::VectorStringBuffer::FlattenSliceInternal(duckdb::LogicalType const&, duckdb::SelectionVector const&, unsigned long) const",other
+eight,0.01,1,duckdb,"duckdb::VectorStringBuffer::SetValue(duckdb::LogicalType const&, unsigned long, duckdb::Value const&)",other
+eight,0.01,1,duckdb,duckdb::VectorStructBuffer::SetVectorSize(unsigned long) [clone .cold],other
+eight,0.01,1,duckdb,"duckdb::VectorStructBuffer::SliceInternal(duckdb::LogicalType const&, duckdb::SelectionVector const&, unsigned long)",other
+eight,0.01,1,duckdb,duckdb::VectorStructBuffer::~VectorStructBuffer(),other
+eight,0.01,1,duckdb,duckdb_je_arena_cache_bin_fill_small,other
+eight,0.01,1,duckdb,duckdb_je_decay_maybe_advance_epoch,other
+eight,0.01,1,duckdb,duckdb_je_free_default,other
+eight,0.01,1,duckdb,duckdb_je_te_event_trigger,other
+eight,0.01,1,duckdb,duckdb_v2_scalar_function_exec_get_row_count,other
+eight,0.01,1,duckdb,duckdb_v2_vector_get_view,other
+eight,0.01,1,duckdb,pthread_mutex_unlock@plt,mutex
+eight,0.01,1,duckdb,"void std::vector<duckdb::Vector, std::allocator<duckdb::Vector> >::_M_realloc_insert<duckdb::Vector&, duckdb::SelectionVector const&, duckdb::count_t&>(__gnu_cxx::__normal_iterator<duckdb::Vector*, std::vector<duckdb::Vector, std::allocator<duckdb::Vector> > >, duckdb::Vector&, duckdb::SelectionVector const&, duckdb::count_t&)",allocator
+eight,0.01,1,ducksassy.duckdb_extension,pthread_once@plt,pthread_once
+eight,0.01,1,libc.so.6,__posix_memalign,allocator
+eight,0.01,1,libc.so.6,memcpy@@GLIBC_2.14@plt,other
+eight,0.01,1,libstdc++.so.6.0.33,operator delete[](void*),other
+eight,0.01,1,libstdc++.so.6.0.33,operator new(unsigned long),other
+ascii,15.86,1261,ducksassy.duckdb_extension,sassy::search::MatchBatch::process,sassy_search_traceback_encoding
+ascii,13.6,1081,libc.so.6,__memset_avx2_unaligned_erms,copy_or_zero
+ascii,8.66,688,ducksassy.duckdb_extension,sassy::search::Searcher<P>::search_one_strand,sassy_search_traceback_encoding
+ascii,7.38,587,libc.so.6,malloc,allocator
+ascii,7.35,584,libc.so.6,_int_free,allocator
+ascii,4.34,345,libc.so.6,_int_malloc,allocator
+ascii,4.05,322,libc.so.6,__memmove_avx_unaligned_erms,copy_or_zero
+ascii,2.92,232,ducksassy.duckdb_extension,sassy_c::append_matches,other
+ascii,2.92,232,ducksassy.duckdb_extension,scalar_exec,other
+ascii,2.74,218,ducksassy.duckdb_extension,<pa_types::cigar::Cigar as alloc::string::ToString>::to_string,cigar_formatting
+ascii,2.44,194,libc.so.6,cfree@GLIBC_2.2.5,allocator
+ascii,2.43,193,libc.so.6,malloc_consolidate,allocator
+ascii,2.3,183,duckdb,"void duckdb::ScalarFunction::UnaryFunction<duckdb::string_t, long, duckdb::(anonymous namespace)::StringLengthOperator>(duckdb::DataChunk&, duckdb::ExpressionState&, duckdb::Vector&)",other
+ascii,2.16,172,libc.so.6,unlink_chunk.isra.0,other
+ascii,1.23,98,ducksassy.duckdb_extension,core::fmt::Formatter::pad_integral,cigar_formatting
+ascii,1.2,95,libc.so.6,_mid_memalign.isra.0,allocator
+ascii,1.13,90,ducksassy.duckdb_extension,core::fmt::write,cigar_formatting
+ascii,0.99,79,ducksassy.duckdb_extension,core::fmt::num::imp::<impl core::fmt::Display for i32>::fmt,cigar_formatting
+ascii,0.99,79,ducksassy.duckdb_extension,sassy::search::MatchBatch::add,sassy_search_traceback_encoding
+ascii,0.82,65,ducksassy.duckdb_extension,alloc::raw_vec::finish_grow,other
+ascii,0.82,65,ducksassy.duckdb_extension,alloc::vec::Vec$LT$T$C$A$GT$::retain::_$u7b$$u7b$closure$u7d$$u7d$::h3c0cdedd7a33ca83,other
+ascii,0.7,56,ducksassy.duckdb_extension,pa_types::cigar::Cigar::push,other
+ascii,0.69,55,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc35___rust_no_alloc_shim_is_unstable_v2,other
+ascii,0.69,55,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+ascii,0.67,53,ducksassy.duckdb_extension,<sassy::profiles::ascii::Ascii<_> as sassy::profiles::Profile>::encode_pattern,other
+ascii,0.65,52,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc11___rdl_alloc,other
+ascii,0.64,51,libc.so.6,__memcmp_avx2_movbe,other
+ascii,0.63,50,ducksassy.duckdb_extension,<alloc::string::String as core::fmt::Write>::write_char,cigar_formatting
+ascii,0.59,47,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+ascii,0.53,42,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc14___rust_dealloc,other
+ascii,0.49,39,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc12___rust_alloc,other
+ascii,0.49,39,ducksassy.duckdb_extension,alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,other
+ascii,0.49,39,ducksassy.duckdb_extension,write_bytes,other
+ascii,0.48,38,duckdb,"duckdb::ValidityMask::CopySel(duckdb::ValidityMask const&, duckdb::SelectionVector const&, unsigned long, unsigned long, unsigned long)",other
+ascii,0.45,36,libc.so.6,__posix_memalign,allocator
+ascii,0.43,34,duckdb,"void duckdb::AggregateExecutor::ExecuteUnaryClustered<duckdb::SumState<duckdb::hugeint_t>, int, duckdb::(anonymous namespace)::SumToHugeintOperation>(duckdb::Vector&, duckdb::AggregateInputData&, duckdb::ClusteredAggr const&, unsigned long) [clone .isra.0]",other
+ascii,0.38,30,ducksassy.duckdb_extension,<alloc::string::String as core::fmt::Write>::write_str,cigar_formatting
+ascii,0.38,30,libc.so.6,realloc,allocator
+ascii,0.33,26,ducksassy.duckdb_extension,<char as core::fmt::Display>::fmt,cigar_formatting
+ascii,0.33,26,ducksassy.duckdb_extension,alloc::raw_vec::finish_grow,other
+ascii,0.31,25,duckdb,"void duckdb::AggregateExecutor::ExecuteUnaryClustered<duckdb::SumState<duckdb::hugeint_t>, long, duckdb::(anonymous namespace)::SumToHugeintOperation>(duckdb::Vector&, duckdb::AggregateInputData&, duckdb::ClusteredAggr const&, unsigned long) [clone .isra.0]",other
+ascii,0.3,24,ducksassy.duckdb_extension,core::fmt::Formatter::pad_integral::write_prefix,cigar_formatting
+ascii,0.24,19,ducksassy.duckdb_extension,pa_types::cigar::Cigar::reverse,other
+ascii,0.2,16,duckdb,"duckdb::PhysicalUnnest::ExecuteInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::DataChunk&, duckdb::OperatorState&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&, bool)",other
+ascii,0.2,16,libc.so.6,_int_realloc,allocator
+ascii,0.19,15,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+ascii,0.15,12,libc.so.6,_int_free_merge_chunk,allocator
+ascii,0.13,10,ducksassy.duckdb_extension,sassy_c::validate_alphabet,alphabet_validation
+ascii,0.11,9,ducksassy.duckdb_extension,alloc::raw_vec::finish_grow,other
+ascii,0.09,7,ducksassy.duckdb_extension,"alloc::raw_vec::RawVec<T,A>::grow_one",other
+ascii,0.06,5,duckdb,duckdb::VectorCacheEntry::ResetFromCache(duckdb::Vector&),other
+ascii,0.06,5,duckdb,std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release(),other
+ascii,0.05,4,ducksassy.duckdb_extension,sassy_c::sassy_c_search_many,other
+ascii,0.04,3,duckdb,duckdb::DictionaryBuffer::ToUnifiedFormat(duckdb::UnifiedVectorFormat&) const,other
+ascii,0.04,3,duckdb,duckdb_v2_error_info_destroy,other
+ascii,0.04,3,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc13___rdl_dealloc,other
+ascii,0.04,3,ducksassy.duckdb_extension,sassy::search::Searcher<P>::search_handle_rc,sassy_search_traceback_encoding
+ascii,0.04,3,ld-linux-x86-64.so.2,__tls_get_addr,other
+ascii,0.03,2,duckdb,duckdb::DictionaryBuffer::~DictionaryBuffer(),other
+ascii,0.03,2,duckdb,"duckdb::PipelineExecutor::Execute(duckdb::DataChunk&, duckdb::DataChunk&, unsigned long)",other
+ascii,0.03,2,duckdb,"duckdb::UncompressedStringStorage::StringScanPartial(duckdb::ColumnSegment&, duckdb::ColumnScanState&, unsigned long, duckdb::Vector&, unsigned long)",other
+ascii,0.03,2,duckdb,duckdb::VectorBuffer::SetVectorSize(unsigned long),other
+ascii,0.03,2,duckdb,duckdb_je_edata_heap_first,other
+ascii,0.03,2,duckdb,"void duckdb::AggregateFunction::NullaryClusterUpdate<long, duckdb::(anonymous namespace)::CountStarFunction>(duckdb::Vector*, duckdb::AggregateInputData&, unsigned long, duckdb::ClusteredAggr const&, unsigned long)",other
+ascii,0.03,2,ducksassy.duckdb_extension,<&[u8] as alloc::ffi::c_str::CString::new::SpecNewImpl>::spec_new_impl,other
+ascii,0.03,2,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc14___rust_realloc,allocator
+ascii,0.03,2,ducksassy.duckdb_extension,sassy::search::MultiPattern::len,sassy_search_traceback_encoding
+ascii,0.03,2,libc.so.6,_int_free_maybe_consolidate,allocator
+ascii,0.01,1,duckdb,duckdb::Allocator::~Allocator(),other
+ascii,0.01,1,duckdb,duckdb::ClusteredAggr::ClusterIter(duckdb::Vector const&) const,other
+ascii,0.01,1,duckdb,duckdb::DataChunk::Reset(),other
+ascii,0.01,1,duckdb,duckdb::DataChunk::SetChildCardinality(unsigned long),other
+ascii,0.01,1,duckdb,duckdb::Executor::ExecuteTask(),other
+ascii,0.01,1,duckdb,duckdb::ExecutorTask::Execute(duckdb::TaskExecutionMode),other
+ascii,0.01,1,duckdb,"duckdb::ExpressionExecutor::Execute(duckdb::BoundFunctionExpression const&, duckdb::ExpressionState*, duckdb::SelectionVector const*, unsigned long, duckdb::Vector&)",other
+ascii,0.01,1,duckdb,"duckdb::ExpressionExecutor::Execute(duckdb::Expression const&, duckdb::ExpressionState*, duckdb::SelectionVector const*, unsigned long, duckdb::Vector&)",other
+ascii,0.01,1,duckdb,"duckdb::ExpressionExecutor::Verify(duckdb::Expression const&, duckdb::Vector&, unsigned long)",other
+ascii,0.01,1,duckdb,"duckdb::FlattenVectorBuffer(unsigned char*, unsigned char const*, duckdb::SelectionVector const&, unsigned long, unsigned long)",other
+ascii,0.01,1,duckdb,duckdb::LogicalType::LogicalType(duckdb::LogicalType&&),other
+ascii,0.01,1,duckdb,duckdb::MatchStep::Child(duckdb::MatchInput),other
+ascii,0.01,1,duckdb,"duckdb::PackratMatchState::StoreResult(duckdb::Matcher const&, duckdb::MatchState&, duckdb::MatcherResult const&) const",other
+ascii,0.01,1,duckdb,"duckdb::PhysicalTableScan::GetDataInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::OperatorSourceInput&) const",other
+ascii,0.01,1,duckdb,"duckdb::PhysicalUngroupedAggregate::Sink(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::OperatorSinkInput&) const",other
+ascii,0.01,1,duckdb,"duckdb::PipelineExecutor::ExecutePushInternal(duckdb::DataChunk&, duckdb::ExecutionBudget&, unsigned long)",other
+ascii,0.01,1,duckdb,duckdb::PipelineExecutor::StartOperator(duckdb::PhysicalOperator&),other
+ascii,0.01,1,duckdb,"duckdb::RowGroup::ProcessPreparedScan(duckdb::ScanOptions, duckdb::CollectionScanState&, duckdb::DataChunk&)",other
+ascii,0.01,1,duckdb,"duckdb::RowGroup::RegisterScanIO(duckdb::CollectionScanState&, unsigned long, duckdb::PrefetchState&) const",other
+ascii,0.01,1,duckdb,duckdb::StandardVectorBuffer::ResetCapacity(unsigned long),other
+ascii,0.01,1,duckdb,"duckdb::StandardVectorBuffer::SliceInternal(duckdb::LogicalType const&, duckdb::SelectionVector const&, unsigned long)",other
+ascii,0.01,1,duckdb,"duckdb::StringUtil::CIEquals(char const*, unsigned long, char const*, unsigned long)",other
+ascii,0.01,1,duckdb,duckdb::TypedTransformResult<duckdb::LogicalType>::GetValuePointer(char const*),other
+ascii,0.01,1,duckdb,duckdb::UnifiedVectorFormat::~UnifiedVectorFormat(),other
+ascii,0.01,1,duckdb,"duckdb::UnnestOperatorState::PrepareInput(duckdb::DataChunk&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&)",other
+ascii,0.01,1,duckdb,duckdb::UnnestOperatorState::ResetState(),other
+ascii,0.01,1,duckdb,duckdb::ValidityMask::Resize(unsigned long),other
+ascii,0.01,1,duckdb,"duckdb::Vector::Vector(duckdb::Vector const&, duckdb::SelectionVector const&, unsigned long)",other
+ascii,0.01,1,duckdb,duckdb::VectorStringBuffer::ClearAuxiliaryData(),other
+ascii,0.01,1,duckdb,duckdb::VectorStringBuffer::GetHeap() [clone .part.0],other
+ascii,0.01,1,duckdb,duckdb::VectorStringBuffer::VectorStringBuffer(duckdb::capacity_t),other
+ascii,0.01,1,duckdb,"duckdb::VectorStructBuffer::SliceInternal(duckdb::LogicalType const&, duckdb::SelectionVector const&, unsigned long)",other
+ascii,0.01,1,duckdb,duckdb::VectorStructBuffer::~VectorStructBuffer(),other
+ascii,0.01,1,duckdb,duckdb_je_arena_bin_choose,other
+ascii,0.01,1,duckdb,pac_alloc_real,other
+ascii,0.01,1,duckdb,"std::_Sp_counted_ptr_inplace<duckdb::DictionaryEntry, std::allocator<void>, (__gnu_cxx::_Lock_policy)2>::_M_dispose()",other
+ascii,0.01,1,duckdb,"std::_Sp_counted_ptr_inplace<duckdb::VectorStringBuffer, std::allocator<void>, (__gnu_cxx::_Lock_policy)2>::_M_dispose()",other
+ascii,0.01,1,duckdb,tcache_bin_flush_edatas_lookup.isra.0,other
+ascii,0.01,1,duckdb,void duckdb::UnifiedVectorFormat::VerifyVectorType<duckdb::string_t>() const,other
+ascii,0.01,1,duckdb,"void duckdb::shared_ptr<duckdb::StandardVectorBuffer, true>::__enable_weak_this<duckdb::VectorBuffer, duckdb::StandardVectorBuffer, 0>(duckdb::enable_shared_from_this<duckdb::VectorBuffer> const*, duckdb::StandardVectorBuffer*) [clone .part.0]",other
+ascii,0.01,1,ducksassy.duckdb_extension,_RNvCsj3IbkTTFM3W_7___rustc13___rdl_realloc,allocator
+ascii,0.01,1,ducksassy.duckdb_extension,alloc::ffi::c_str::CString::_from_vec_unchecked,other
+ascii,0.01,1,ducksassy.duckdb_extension,memcpy@plt,other
+ascii,0.01,1,ducksassy.duckdb_extension,sassy_c::sassy_c_result_view,other
+ascii,0.01,1,ducksassy.duckdb_extension,sassy_c::search_inputs,other
+ascii,0.01,1,ducksassy.duckdb_extension,sassy_c_search_many,other
+ascii,0.01,1,libc.so.6,__ctype_tolower_loc,other
+ascii,0.01,1,libc.so.6,memcpy@@GLIBC_2.14@plt,other
+ascii,0.01,1,libc.so.6,pthread_mutex_trylock@@GLIBC_2.34,mutex
+ascii,0.01,1,libc.so.6,pthread_once@GLIBC_2.2.5,pthread_once
+ascii,0.01,1,libstdc++.so.6.0.33,operator new(unsigned long),other

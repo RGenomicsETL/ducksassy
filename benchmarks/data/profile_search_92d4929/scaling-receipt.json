@@ -1,0 +1,56 @@
+{
+  "source_revision": "92d49294692d3f64709927d89706cfa9c752c3c3",
+  "extension_sha256": "a629200a08d52d1d9e002add73a4a73768f3c745815b5ab5ac0e794e3ab30be9",
+  "driver_sha256": "58f2ba3ecea95ea926a2bd7750673eb90fb636eb2b029d5eae2f8fc4b8e1894d",
+  "cli_sha256": "cc449920df344bcd56a8d71227ff9cf4debc9cad03c3003fb064a313840e8c6c",
+  "results": {
+    "small-hits": [
+      {
+        "hits": 262676,
+        "cost_sum": 449,
+        "cigar_bytes": 789607
+      }
+    ],
+    "small-count": [
+      {
+        "hits": 262676
+      }
+    ],
+    "small-contains": [
+      {
+        "hits": 262144
+      }
+    ],
+    "small-scan": [
+      {
+        "bytes": 67108864
+      }
+    ],
+    "large-hits": [
+      {
+        "hits": 2101408,
+        "cost_sum": 3592,
+        "cigar_bytes": 6316856
+      }
+    ],
+    "large-count": [
+      {
+        "hits": 2101408
+      }
+    ],
+    "large-contains": [
+      {
+        "hits": 2097152
+      }
+    ],
+    "large-scan": [
+      {
+        "bytes": 536870912
+      }
+    ]
+  },
+  "backend": "avx2",
+  "cpu_sets": ["19", "18-19", "16-19", "12-19"],
+  "measured_at_utc": "2026-09-22 21:26:26 UTC",
+  "timing": "Warm persistent SQL, resident tables, R elapsed including CLI exchange; CPU time from /proc/PID/stat. Five repetitions. Large repeats the verified small workload eight times."
+}

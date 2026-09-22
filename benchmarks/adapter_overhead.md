@@ -3,6 +3,9 @@ Sassy library and Ducksassy adapter timings
 
 ## Results
 
+The [CPU profiles and scaling study](profile_search.md) identify allocation,
+CIGAR formatting and host polling costs, and test balanced parallel workloads.
+
 Sassy 0.2.6, AVX2, one thread pinned to CPU 19 on an Intel Core i5-13500.
 Medians of seven runs after a warm-up. All inputs are resident before timing.
 

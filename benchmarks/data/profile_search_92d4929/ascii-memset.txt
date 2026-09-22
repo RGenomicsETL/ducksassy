@@ -1,0 +1,59 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+# comm: duckdb
+#
+# Total Lost Samples: 0
+#
+# Samples: 7K of event 'cpu-clock:u'
+# Event count (approx.): 15929859592
+#
+# Overhead  Shared Object  Symbol
+# ........  .............  ................................
+#
+    13.60%  libc.so.6      [.] __memset_avx2_unaligned_erms
+            |
+            |--13.56%--0xffffffffffffffff
+            |          duckdb_shell::ShellState::RunOneSqlLine(duckdb_shell::InputMode, char*)
+            |          duckdb_shell::ShellState::ExecuteSQL(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+            |          duckdb_shell::ShellState::ExecuteStatement(duckdb::unique_ptr<duckdb::SQLStatement, std::default_delete<duckdb::SQLStatement>, true>)
+            |          duckdb_shell::ShellState::RenderQueryResult(duckdb_shell::ShellRenderer&, duckdb::QueryResultStream&, duckdb_shell::PagerMode)
+            |          duckdb_shell::ShellState::RenderPreparedResult(duckdb_shell::ShellRenderer&, duckdb_shell::RenderingQueryResult&, duckdb_shell::PagerMode)
+            |          duckdb_shell::ShellRenderer::RenderQueryResult(duckdb_shell::PrintStream&, duckdb_shell::ShellState&, duckdb_shell::RenderingQueryResult&)
+            |          duckdb_shell::RenderingResultIterator::RenderingResultIterator(duckdb::optional_ptr<duckdb_shell::RenderingQueryResult, true>)
+            |          duckdb_shell::RenderingQueryResult::TryConvertChunk()
+            |          duckdb::QueryResultStream::Fetch()
+            |          duckdb::QueryResultStream::FetchInternal(duckdb::ClientContextLock&)
+            |          duckdb::BufferedData::ReplenishBuffer(duckdb::ClientContextLock&, duckdb::QueryResult&)
+            |          duckdb::BufferedData::Participate(duckdb::ClientContextLock&, duckdb::QueryResult&)
+            |          duckdb::ClientContext::ExecuteTaskInternal(duckdb::ClientContextLock&, duckdb::BaseQueryResult&)
+            |          duckdb::Executor::ExecuteTask()
+            |          duckdb::ExecutorTask::Execute(duckdb::TaskExecutionMode)
+            |          duckdb::PipelineTask::ExecuteTask(duckdb::TaskExecutionMode)
+            |          duckdb::PipelineExecutor::Execute(unsigned long)
+            |          duckdb::PipelineExecutor::ExecutePushInternal(duckdb::DataChunk&, duckdb::ExecutionBudget&, unsigned long)
+            |          duckdb::PipelineExecutor::Execute(duckdb::DataChunk&, duckdb::DataChunk&, unsigned long)
+            |          duckdb::PhysicalUnnest::ExecuteInternal(duckdb::ExecutionContext&, duckdb::DataChunk&, duckdb::DataChunk&, duckdb::OperatorState&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&, bool)
+            |          duckdb::UnnestOperatorState::PrepareInput(duckdb::DataChunk&, duckdb::vector<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true>, true, std::allocator<duckdb::unique_ptr<duckdb::Expression, std::default_delete<duckdb::Expression>, true> > > const&)
+            |          duckdb::ExpressionExecutor::Execute(duckdb::DataChunk*, duckdb::DataChunk&)
+            |          duckdb::ExpressionExecutor::Execute(duckdb::Expression const&, duckdb::ExpressionState*, duckdb::SelectionVector const*, unsigned long, duckdb::Vector&)
+            |          duckdb::ExpressionExecutor::Execute(duckdb::BoundFunctionExpression const&, duckdb::ExpressionState*, duckdb::SelectionVector const*, unsigned long, duckdb::Vector&)
+            |          duckdb::capiv2::CV2ScalarExec(duckdb::DataChunk&, duckdb::ExpressionState&, duckdb::Vector&)
+            |          scalar_exec
+            |          sassy_c::sassy_c_search_many
+            |          sassy::search::Searcher<P>::search_handle_rc
+            |          sassy::search::Searcher<P>::search_one_strand
+            |          __memset_avx2_unaligned_erms
+            |
+            |--0.03%--0x57cad47329bf
+            |          duckdb::StandardVectorBuffer::ReserveInternal(unsigned long)
+            |          __memset_avx2_unaligned_erms
+            |
+             --0.01%--0x57cad432e46f
+                       duckdb::StandardVectorBuffer::ReserveInternal(unsigned long)
+                       __memset_avx2_unaligned_erms
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

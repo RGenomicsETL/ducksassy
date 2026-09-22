@@ -1,0 +1,41 @@
+{
+  "one": {
+    "threads": 1,
+    "operation": "hits",
+    "expected": [
+      {
+        "hits": 2101408,
+        "cost_sum": 3592,
+        "cigar_bytes": 6316856
+      }
+    ],
+    "profiled_elapsed_seconds": 25.997,
+    "duckdb_samples": 12968
+  },
+  "eight": {
+    "threads": 8,
+    "operation": "hits",
+    "expected": [
+      {
+        "hits": 2101408,
+        "cost_sum": 3592,
+        "cigar_bytes": 6316856
+      }
+    ],
+    "profiled_elapsed_seconds": 9.067,
+    "duckdb_samples": 13590
+  },
+  "ascii": {
+    "threads": 1,
+    "operation": "ascii",
+    "expected": [
+      {
+        "hits": 8388608,
+        "cost_sum": 0,
+        "cigar_bytes": 16777216
+      }
+    ],
+    "profiled_elapsed_seconds": 16.076,
+    "duckdb_samples": 7914
+  }
+}

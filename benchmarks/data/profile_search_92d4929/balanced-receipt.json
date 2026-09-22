@@ -1,0 +1,16 @@
+{
+  "source_revision": "92d49294692d3f64709927d89706cfa9c752c3c3",
+  "driver_sha256": "4a02938af14f98114552e3b1c1071a34613b25045e4004b3dcc4d45f03bdcb06",
+  "extension_sha256": "a629200a08d52d1d9e002add73a4a73768f3c745815b5ab5ac0e794e3ab30be9",
+  "cli_sha256": "cc449920df344bcd56a8d71227ff9cf4debc9cad03c3003fb064a313840e8c6c",
+  "expected": [
+    {
+      "hits": 985015,
+      "cost_sum": 1656,
+      "cigar_bytes": 2960824
+    }
+  ],
+  "backend": "avx2",
+  "cpu_sets": ["19", "18-19", "16-19", "12-19"],
+  "measured_at_utc": "2026-09-22 21:21:55 UTC"
+}
