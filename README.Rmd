@@ -252,10 +252,13 @@ and can hold hits and scratch space before DuckDB receives the result. A long
 FASTA record is therefore still one large search. Separate DuckDB workers have
 separate native searchers, so parallel searches can increase peak native memory.
 
-- `max_text_bytes` rejects a sequence **before** search when it exceeds 1 MiB
-  by default. For a known long record, raise it in the call: the 4.6 Mb
-  benchmark uses `max_text_bytes := 8388608`. This permits the search; it does
-  not reserve or guarantee 8 MiB of memory.
+- `max_text_bytes` is an opt-in guard against an unexpectedly long record
+  entering native search. It rejects a sequence **before** search when it
+  exceeds 1 MiB by default. That default is a policy choice, not a measured
+  safe-memory threshold, and whole chromosomes exceed it. For a known long
+  record, raise it in the call: the 4.6 Mb benchmark uses
+  `max_text_bytes := 8388608`. This permits the search; it does not reserve or
+  guarantee 8 MiB of memory.
 - `max_hits` limits the hits returned for one sequence and its pattern panel.
   It defaults to 10,000 for value, FASTQ and table searches, or 1,000,000 for
   FASTA and CRISPR searches. The check runs **after each pattern search**, so a
