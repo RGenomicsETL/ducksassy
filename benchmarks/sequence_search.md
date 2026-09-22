@@ -4,48 +4,20 @@ Ducksassy sequence-search benchmarks
 ## Results
 
 Sassy **0.2.6**, Ducksassy
-**4db0a8577e045406b9ce88a8b601dedb0c071eab**, Intel Core i5-13500.
+**87653fda17a28498414b621bb1bd7a8aaea75ba4**, Intel Core i5-13500.
 Medians of seven measured queries after one warm-up; lower times are better.
 
-| workload   | threads | baseline_seconds | avx2_seconds | baseline_over_avx2 |
-|:-----------|--------:|-----------------:|-------------:|-------------------:|
-| crispr     |       1 |            0.154 |        0.095 |              1.621 |
-| crispr     |       4 |            0.154 |        0.096 |              1.604 |
-| fasta      |       1 |            0.098 |        0.090 |              1.089 |
-| fasta      |       4 |            0.098 |        0.091 |              1.077 |
-| relational |       1 |            0.982 |        0.906 |              1.084 |
-| relational |       4 |            0.462 |        0.434 |              1.065 |
+| workload   | threads | scalar_seconds | avx2_seconds | scalar_over_avx2 |
+|:-----------|--------:|---------------:|-------------:|-----------------:|
+| crispr     |       1 |          0.155 |        0.099 |            1.566 |
+| crispr     |       4 |          0.156 |        0.095 |            1.642 |
+| fasta      |       1 |          0.097 |        0.090 |            1.078 |
+| fasta      |       4 |          0.097 |        0.089 |            1.090 |
+| relational |       1 |          0.967 |        0.908 |            1.065 |
+| relational |       4 |          0.463 |        0.431 |            1.074 |
 
-The baseline backend is named `scalar` by Sassy and includes SSE2 on x86-64.
+The `scalar` backend includes SSE2 on x86-64.
 These are SQL end-to-end measurements, not isolated kernel timings.
-
-## Comparison with earlier Ducksassy using Sassy 0.2.1
-
-The [recorded baseline report](https://github.com/RGenomicsETL/ducksassy/blob/00f37cacd21740c7740a8529e4a6745a18d5f602/benchmarks/sequence_search.md)
-uses the same host, DuckDB/DuckHTS artifacts, inputs, query workload, affinity
-settings and repetition counts. Input derivation and complete result
-fingerprints agree; the parameter difference is noted below.
-Negative percentage changes indicate lower observed elapsed time.
-
-| workload   | backend | threads | elapsed_seconds.baseline | elapsed_seconds.current | change_percent |
-|:-----------|:--------|--------:|-------------------------:|------------------------:|---------------:|
-| crispr     | avx2    |       1 |                    0.097 |                   0.095 |         -2.062 |
-| crispr     | avx2    |       4 |                    0.098 |                   0.096 |         -2.041 |
-| crispr     | scalar  |       1 |                    0.156 |                   0.154 |         -1.282 |
-| crispr     | scalar  |       4 |                    0.154 |                   0.154 |          0.000 |
-| fasta      | avx2    |       1 |                    0.091 |                   0.090 |         -1.099 |
-| fasta      | avx2    |       4 |                    0.092 |                   0.091 |         -1.087 |
-| fasta      | scalar  |       1 |                    0.096 |                   0.098 |          2.083 |
-| fasta      | scalar  |       4 |                    0.097 |                   0.098 |          1.031 |
-| relational | avx2    |       1 |                    0.933 |                   0.906 |         -2.894 |
-| relational | avx2    |       4 |                    0.446 |                   0.434 |         -2.691 |
-| relational | scalar  |       1 |                    0.969 |                   0.982 |          1.342 |
-| relational | scalar  |       4 |                    0.456 |                   0.462 |          1.316 |
-
-These are sequential runs, not interleaved paired measurements. Small differences
-are not established speedups or regressions; raw repetitions are retained for
-both versions. The earlier queries passed an 8 MiB input-length cap; the current
-queries have no such parameter. Both materialize the same hit results.
 
 ## Workloads
 
@@ -145,10 +117,9 @@ Requires Linux `taskset`, CPUs 16–19 in the allowed affinity set, and AVX2/POP
 - [Validation counts](data/sequence_search_0.2.6/oracle.csv)
 - [Artifact, input, compiler and runtime receipt](data/sequence_search_0.2.6/receipt.json)
 - [Query templates](data/sequence_search_0.2.6/queries.sql)
-- [Sassy 0.2.1 timings](data/sequence_search_0.2.1/timings.csv)
 - [Driver](sequence_search.R)
 
-Extension SHA-256: 10d775736b9934cc427b723ca3e6f63d106b1bdd89b068201f19132b2011dc86.
+Extension SHA-256: 7ae010f8547e09630d8c361b41df5d0e9e4610597def93fe3671b0a627394214.
 
 FASTA SHA-256: a0ca3984234be9bd174e1f4691f062cc2a1a7dc24fb5c76b7d2f523f79f0c27c;
 4699686 bytes.

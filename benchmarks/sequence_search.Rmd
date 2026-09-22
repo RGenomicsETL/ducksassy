@@ -17,8 +17,8 @@ summary <- aggregate(elapsed_seconds ~ workload + backend + threads, raw, median
 summary <- reshape(summary, idvar = c("workload", "threads"), timevar = "backend", direction = "wide")
 summary <- summary[order(summary$workload, summary$threads), ]
 summary <- data.frame(workload = summary$workload, threads = summary$threads,
-  baseline_seconds = summary$elapsed_seconds.scalar, avx2_seconds = summary$elapsed_seconds.avx2,
-  baseline_over_avx2 = summary$elapsed_seconds.scalar / summary$elapsed_seconds.avx2)
+  scalar_seconds = summary$elapsed_seconds.scalar, avx2_seconds = summary$elapsed_seconds.avx2,
+  scalar_over_avx2 = summary$elapsed_seconds.scalar / summary$elapsed_seconds.avx2)
 denominators <- unique(raw[c("workload", "input_records", "patterns_per_record", "input_bases", "searched_pair_bases", "output_hits", "aggregate_rows")])
 ```
 
@@ -32,7 +32,7 @@ Medians of seven measured queries after one warm-up; lower times are better.
 knitr::kable(summary, digits = 3, row.names = FALSE)
 ```
 
-The baseline backend is named `scalar` by Sassy and includes SSE2 on x86-64.
+The `scalar` backend includes SSE2 on x86-64.
 These are SQL end-to-end measurements, not isolated kernel timings.
 
 ## Workloads
