@@ -1,4 +1,5 @@
 ^DESCRIPTION[.]in$
+^README[.]Rmd$
 ^cran-comments[.]md$
 ^src/ducksassy[.]duckdb_extension$
 ^src/build$

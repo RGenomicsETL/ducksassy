@@ -60,6 +60,10 @@ hit.
 - Search files through DuckHTS, or call the scalar functions on any sequence
   column. Results stay in DuckDB for joins, counts and downstream queries.
 
+The [library and adapter comparison](benchmarks/adapter_overhead.md) measures
+direct upstream Sassy calls, the Rust C ABI and SQL over identical resident
+inputs, checking the complete hit multisets.
+
 The [measured workloads](benchmarks/sequence_search.md) include eight 23-base
 guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The timed
 comparison includes Ducksassy's `scalar` and AVX2 backends and an upstream
@@ -99,8 +103,8 @@ outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
 ### R package
 
 [`Rducksassy`](r/Rducksassy/README.md) builds the extension from bundled sources
-and provides `rducksassy_connect()` and `rducksassy_load()`. It uses the
-`duckdb.2.0.dev` preview host and the extension bundled by `Rduckhts`.
+and provides `rducksassy_connect()` and `rducksassy_load()`. It requires
+a DuckDB host with C API v2 support and the extension bundled by `Rduckhts`.
 Its examples include searching BAM read sequences while retaining alignment
 identifiers for SQL joins and summaries.
 
@@ -110,7 +114,9 @@ install.packages("Rducksassy", repos = c(
   "https://duckdb.r-universe.dev",
   "https://cloud.r-project.org"
 ))
-con <- Rducksassy::rducksassy_connect()
+# One available C API v2 host; other compatible drivers can be supplied.
+install.packages("duckdb.2.0.dev", repos = "https://duckdb.r-universe.dev")
+con <- Rducksassy::rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
 DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
 DBI::dbDisconnect(con, shutdown = TRUE)
 ```

@@ -1,4 +1,4 @@
-.PHONY: all setup setup-data sdk vendor-rust r-package configure release test sql-test oracle-test r-test readme benchmarks clean
+.PHONY: all setup setup-data sdk vendor-rust r-package r-readme configure release test sql-test oracle-test r-test readme benchmarks clean
 BUILD_DIR ?= build
 DUCKDB_CAPI_DIR ?= $(CURDIR)/duckdb_capi
 JOBS ?= 2
@@ -17,6 +17,8 @@ vendor-rust:
 r-package:
 	Rscript tools/stage_r_package.R
 	R CMD build r/Rducksassy
+r-readme:
+	Rscript -e 'rmarkdown::render("r/Rducksassy/README.Rmd", quiet = TRUE)'
 configure:
 	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release -DDUCKDB_CAPI_DIR=$(DUCKDB_CAPI_DIR)
 release: configure

@@ -1,0 +1,9 @@
+bibentry(
+  bibtype = "Article",
+  title = "Sassy: fuzzy Searching DNA Sequences using SIMD",
+  author = c(person("Rick", "Beeloo"), person("Ragnar", "Groot Koerkamp")),
+  journal = "Bioinformatics",
+  year = "2026",
+  doi = "10.1093/bioinformatics/btag244",
+  header = "For the Sassy search library used by Rducksassy, cite:"
+)

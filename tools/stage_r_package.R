@@ -21,19 +21,14 @@ for (path in files) {
 dir.create(file.path(package, "inst", "sql"), recursive = TRUE, showWarnings = FALSE)
 stopifnot(file.copy(file.path(root, "sql", "ducksassy.sql"),
                    file.path(package, "inst", "sql"), overwrite = TRUE))
-stopifnot(file.copy(file.path(root, "third_party", "rust", "NOTICE"),
-                   file.path(package, "inst"), overwrite = TRUE))
+notices <- c("DuckDB C API headers and extension metadata tool.",
+             "Copyright 2018-2026 Stichting DuckDB Foundation.",
+             "License: MIT; see licenses/DuckDB for the full license.", "",
+             readLines(file.path(root, "third_party", "rust", "NOTICE")))
+writeLines(notices, file.path(package, "inst", "LICENCE.note"))
 dir.create(file.path(package, "inst", "licenses"), showWarnings = FALSE)
 stopifnot(file.copy(file.path(root, "duckdb_capi", "LICENSE"),
                    file.path(package, "inst", "licenses", "DuckDB"), overwrite = TRUE))
-description <- read.dcf(file.path(package, "DESCRIPTION.in"))
-authors <- readLines(file.path(root, "third_party", "rust", "AUTHORS"))
-contributors <- lapply(authors, function(author) {
-  utils::person(given = sub(" *<.*$", "", author), role = "ctb",
-                comment = "Rust dependency; see NOTICE")
-})
-people <- eval(parse(text = description[1L, "Authors@R"]))
-for (contributor in contributors) people <- c(people, contributor)
-description[1L, "Authors@R"] <- paste(format(people, style = "R"), collapse = "\n")
-write.dcf(description, file.path(package, "DESCRIPTION"), keep.white = "Authors@R")
+stopifnot(file.copy(file.path(package, "DESCRIPTION.in"),
+                   file.path(package, "DESCRIPTION"), overwrite = TRUE))
 message("Staged ", length(files), " extension source files in ", package)

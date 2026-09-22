@@ -55,8 +55,9 @@ This ratio compares two complete application paths. Upstream includes process
 startup and writing TSV; Ducksassy uses a persistent session and aggregates every
 hit. Both include FASTA reading and searching. The difference includes those
 execution and output choices, so it does not isolate the C adapter's cost. Upstream
-TSV parsing and result validation happen outside its timer. A library-only timing
-would be needed to isolate the cost of validation, FFI and DuckDB result building.
+TSV parsing and result validation happen outside its timer. The
+[library and adapter measurements](adapter_overhead.md) compare direct upstream
+calls, the Rust C ABI and SQL over identical resident inputs.
 
 ## Workloads
 

@@ -4,23 +4,33 @@
 \alias{rducksassy_connect}
 \title{Open a DuckDB connection with Ducksassy and DuckHTS}
 \usage{
-rducksassy_connect(dbdir = ":memory:", read_only = FALSE)
+rducksassy_connect(
+  dbdir = ":memory:",
+  read_only = FALSE,
+  driver = getOption("Rducksassy.driver")
+)
 }
 \arguments{
 \item{dbdir}{Database file or \code{":memory:"}.}
 
 \item{read_only}{Open an existing database read-only.}
+
+\item{driver}{Driver constructor, defaulting to \code{duckdb::duckdb}.
+Supply another DuckDB DBI driver constructor for a host with C API v2
+support. It receives \code{dbdir}, \code{read_only} and \code{config}.}
 }
 \value{
 A DBI connection. Close it with \code{DBI::dbDisconnect(con, shutdown = TRUE)}.
 }
 \description{
-Uses the DuckDB C API v2 preview host supplied by \pkg{duckdb.2.0.dev}.
+Requires a DuckDB host with C API v2 support.
 The connection allows loading the extensions built by the R packages.
 Automatic extension downloads are disabled.
 }
 \examples{
+\donttest{
 con <- rducksassy_connect()
 DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
 DBI::dbDisconnect(con, shutdown = TRUE)
+}
 }

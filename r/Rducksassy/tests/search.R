@@ -1,5 +1,18 @@
 library(Rducksassy)
-con <- rducksassy_connect()
+# Exercise whichever host is installed with C API v2. The preview is optional.
+driver <- if (requireNamespace("duckdb.2.0.dev", quietly = TRUE)) {
+  duckdb.2.0.dev::duckdb
+} else {
+  duckdb::duckdb
+}
+con <- tryCatch(rducksassy_connect(driver = driver), error = identity)
+if (inherits(con, "error")) {
+  # A C API v1 host cannot execute search tests. Other load failures are errors.
+  if (!grepl("can only load extensions built for DuckDB C API 'v1.x.y'",
+             conditionMessage(con), fixed = TRUE)) stop(con)
+  message("Search tests require a C API v2 host: ", conditionMessage(con))
+  quit(status = 0L)
+}
 result <- DBI::dbGetQuery(con, "
   SELECT sassy_contains('timeout', 'request timedout', 1,
                         alphabet := 'ascii', rc := false) AS found")

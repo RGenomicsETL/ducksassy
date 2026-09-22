@@ -227,7 +227,43 @@ static void scalar_init(duckdb_v2_scalar_function_init_info_handle info,
     (void)duckdb_v2_error_info_destroy(&detail);
 }
 
-static bool append_hits(duckdb_v2_vector_handle output, const hit_batch_view *batch, idx_t offset,
+typedef struct {
+    duckdb_v2_vector_handle vector;
+    duckdb_v2_vector_handle fields[HIT_FIELD_COUNT];
+    void *data[HIT_FIELD_COUNT];
+    uint64_t *validity[HIT_FIELD_COUNT];
+    uint64_t *struct_validity;
+    duckdb_v2_arena_handle cigar_arena;
+    idx_t capacity;
+} hit_output;
+
+static bool resize_hit_output(hit_output *output, idx_t size,
+                              duckdb_v2_error_info_handle *error) {
+    duckdb_v2_error_info_handle detail = NULL;
+    bool success = false;
+    DUCKDB_CALL(duckdb_v2_vector_set_size(output->vector, size, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(output->vector,
+                                                          &output->struct_validity, &detail));
+    // Resizing can move storage. Refresh every borrowed pointer and the arena.
+    for (idx_t field = 0; field < HIT_FIELD_COUNT; ++field) {
+        DUCKDB_CALL(duckdb_v2_vector_get_child(output->vector, field,
+                                               &output->fields[field], &detail));
+        DUCKDB_CALL(duckdb_v2_vector_set_size(output->fields[field], size, &detail));
+        DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(output->fields[field],
+                                                      &output->data[field], &detail));
+        DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(output->fields[field],
+                                                               &output->validity[field], &detail));
+    }
+    DUCKDB_CALL(duckdb_v2_vector_get_arena(output->fields[HIT_CIGAR],
+                                           &output->cigar_arena, &detail));
+    output->capacity = size;
+    success = true;
+cleanup:
+    (void)duckdb_v2_error_info_destroy(&detail);
+    return success;
+}
+
+static bool append_hits(hit_output *output, const hit_batch_view *batch, idx_t offset,
                         duckdb_v2_error_info_handle *error) {
     duckdb_v2_error_info_handle detail = NULL;
     bool success = false;
@@ -235,22 +271,17 @@ static bool append_hits(duckdb_v2_vector_handle output, const hit_batch_view *ba
         INPUT_ERROR("ducksassy: chunk exceeds 1048576 output hits; reduce the search scope or use "
                     "count/contains");
     }
-    idx_t new_size = offset + batch->hit_count;
-    DUCKDB_CALL(duckdb_v2_vector_set_size(output, new_size, &detail));
-    uint64_t *struct_validity = NULL;
-    DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(output, &struct_validity, &detail));
-    duckdb_v2_vector_handle fields[HIT_FIELD_COUNT] = {0};
-    void *field_data[HIT_FIELD_COUNT] = {0};
-    uint64_t *field_validity[HIT_FIELD_COUNT] = {0};
-    for (idx_t field = 0; field < HIT_FIELD_COUNT; ++field) {
-        DUCKDB_CALL(duckdb_v2_vector_get_child(output, field, &fields[field], &detail));
-        DUCKDB_CALL(duckdb_v2_vector_set_size(fields[field], new_size, &detail));
-        DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(fields[field], &field_data[field], &detail));
-        DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(fields[field],
-                                                               &field_validity[field], &detail));
+    idx_t required = offset + batch->hit_count;
+    if (required > output->capacity) {
+        idx_t capacity = output->capacity ? output->capacity : 2048;
+        while (capacity < required) {
+            capacity *= 2;
+        }
+        if (!resize_hit_output(output, capacity, error)) {
+            goto cleanup;
+        }
     }
-    duckdb_v2_arena_handle cigar_arena = NULL;
-    DUCKDB_CALL(duckdb_v2_vector_get_arena(fields[HIT_CIGAR], &cigar_arena, &detail));
+    void **field_data = output->data;
     for (size_t index = 0; index < batch->hit_count; ++index) {
         idx_t position = offset + index;
         const sassy_c_hit *hit = &batch->hits[index];
@@ -270,10 +301,10 @@ static bool append_hits(duckdb_v2_vector_handle output, const hit_batch_view *ba
         const uint8_t *cigar = hit->cigar_length ? batch->cigars + hit->cigar_offset : NULL;
         duckdb_v2_bytes *cigar_output = &((duckdb_v2_bytes *)field_data[HIT_CIGAR])[position];
         DUCKDB_CALL(
-            write_bytes(cigar_arena, cigar_output, cigar, (size_t)hit->cigar_length, &detail));
-        mark_valid(struct_validity, position);
+            write_bytes(output->cigar_arena, cigar_output, cigar, (size_t)hit->cigar_length, &detail));
+        mark_valid(output->struct_validity, position);
         for (idx_t field = 0; field < HIT_FIELD_COUNT; ++field) {
-            mark_valid(field_validity[field], position);
+            mark_valid(output->validity[field], position);
         }
     }
     success = true;
@@ -300,6 +331,7 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
     uint64_t *output_validity = NULL;
     idx_t row_count = 0;
     idx_t total_hits = 0;
+    hit_output hits = {0};
 
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_user_data(info, &user_data, &detail));
     const search_operation *operation = (const search_operation *)user_data;
@@ -338,6 +370,7 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
     if (output_hits) {
         DUCKDB_CALL(duckdb_v2_vector_get_child(output, 0, &hit_struct, &detail));
         DUCKDB_CALL(duckdb_v2_vector_set_size(hit_struct, 0, &detail));
+        hits.vector = hit_struct;
     }
 
     for (idx_t row = 0; row < row_count; ++row) {
@@ -455,7 +488,7 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         } else if (operation->kind == OP_CONTAINS) {
             ((bool *)output_data)[row] = batch.hit_count != 0;
         } else {
-            if (!append_hits(hit_struct, &batch, total_hits, error)) {
+            if (!append_hits(&hits, &batch, total_hits, error)) {
                 goto cleanup;
             }
             ((duckdb_v2_list_entry *)output_data)[row] =
@@ -465,6 +498,10 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         mark_valid(output_validity, row);
         sassy_c_result_free(result);
         result = NULL;
+    }
+    // Capacity is private to this callback; expose only the initialized hits.
+    if (output_hits && !resize_hit_output(&hits, total_hits, error)) {
+        goto cleanup;
     }
 cleanup:
     sassy_c_result_free(result);

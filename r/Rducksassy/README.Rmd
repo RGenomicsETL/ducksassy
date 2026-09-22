@@ -1,5 +1,15 @@
+---
+output:
+  github_document:
+    html_preview: false
+    pandoc_args: ["--wrap=preserve"]
+---
 
 <!-- README.md is generated from README.Rmd. -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error = FALSE, collapse = TRUE, comment = "#>")
+```
 
 # Rducksassy
 
@@ -9,7 +19,7 @@ filter them and summarize them in the same query.
 
 ## Install
 
-``` r
+```{r install, eval=FALSE}
 install.packages("Rducksassy", repos = c(
   "https://rgenomicsetl.r-universe.dev",
   "https://duckdb.r-universe.dev",
@@ -24,15 +34,15 @@ connection; `rducksassy_connect()` uses `duckdb::duckdb` by default and also
 accepts a driver constructor.
 
 The examples below use `duckdb.2.0.dev`, an optional host available from
-DuckDB’s R-universe. The tested `duckdb` 1.5.5 host supports only C API v1
+DuckDB's R-universe. The tested `duckdb` 1.5.5 host supports only C API v1
 and cannot load this extension.
 
-``` r
+```{r install-example-host, eval=FALSE}
 install.packages("duckdb.2.0.dev", repos = "https://duckdb.r-universe.dev")
 ```
 
-Source installation builds the extension from bundled sources with Rust \>= 1.91,
-Cargo, CMake \>= 3.20, Python 3 and a C11 compiler. Rust dependency resolution is
+Source installation builds the extension from bundled sources with Rust >= 1.91,
+Cargo, CMake >= 3.20, Python 3 and a C11 compiler. Rust dependency resolution is
 locked and offline. Linux is tested; macOS uses the native build path. Windows
 and webR packaging are not implemented. CRAN readiness still depends on a
 released host supporting C API v2.
@@ -42,20 +52,18 @@ released host supporting C API v2.
 Find `timeout` with one edit allowed. The inserted `d` in `timedout` is reported
 in the CIGAR; coordinates are zero-based, half-open byte offsets.
 
-``` r
+```{r text-search}
 con <- Rducksassy::rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
 DBI::dbGetQuery(con, "
   SELECT text_start, text_end, cost, cigar
   FROM sassy_grep('timeout', 'request timedout', 1)
 ")
-#>   text_start text_end cost  cigar
-#> 1          8       16    1 4=1D3=
 ```
 
 Search a text column and group the matching rows without exporting them to a
 separate grep process:
 
-``` r
+```{r text-summary}
 DBI::dbGetQuery(con, "
   WITH logs(service, message) AS (
     VALUES ('api', 'request timedout'),
@@ -68,8 +76,6 @@ DBI::dbGetQuery(con, "
   GROUP BY service
   ORDER BY service
 ")
-#>   service matching_messages
-#> 1     api                 2
 ```
 
 ## Search BAM read sequences
@@ -78,7 +84,7 @@ The included synthetic BAM contains a forward read, a reverse read and a
 secondary alignment. This query excludes secondary and supplementary alignments
 and searches the stored read sequence on both strands:
 
-``` r
+```{r bam-search}
 bam <- system.file("extdata", "crispr_reads.bam", package = "Rducksassy",
                    mustWork = TRUE)
 sql <- paste0(
@@ -89,9 +95,6 @@ sql <- paste0(
   "WHERE (r.FLAG & 2304) = 0 ORDER BY r.QNAME"
 )
 DBI::dbGetQuery(con, sql)
-#>     QNAME     RNAME POS FLAG text_start text_end strand cigar
-#> 1 forward reference   1    0          0        7      +    7=
-#> 2 reverse reference  20   16          0        7      -    7=
 ```
 
 `SEQ` is the text sequence column from `read_bam()`. `hit.text_start` and
@@ -104,7 +107,7 @@ The SQL filter uses flag mask 2304 (`0x100 | 0x800`). Read identifiers and align
 columns remain available for grouping by sample, read group or locus. A guide panel
 can use `sassy_crispr_matches_many()` in the same query.
 
-``` r
+```{r disconnect}
 DBI::dbDisconnect(con, shutdown = TRUE)
 ```
 

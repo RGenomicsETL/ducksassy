@@ -19,10 +19,18 @@ for (command in c("rustc", "cargo", "cmake")) {
   }
 }
 
-driver <- duckdb.2.0.dev::duckdb(shared_home = FALSE)
-con <- DBI::dbConnect(driver)
-platform <- tryCatch(DBI::dbGetQuery(con, "PRAGMA platform")[[1L]],
-                     finally = DBI::dbDisconnect(con, shutdown = TRUE))
+# The extension uses bundled C API headers and does not link to an R driver.
+# DUCKDB_PLATFORM can supply the deployment target when cross-compiling.
+platform <- Sys.getenv("DUCKDB_PLATFORM")
+if (!nzchar(platform)) {
+  system <- Sys.info()[["sysname"]]
+  architecture <- R.version$arch
+  os <- switch(system, Linux = "linux", Darwin = "osx", NA_character_)
+  cpu <- switch(architecture, x86_64 = "amd64", aarch64 = "arm64",
+                arm64 = "arm64", NA_character_)
+  if (is.na(os) || is.na(cpu)) stop("Set DUCKDB_PLATFORM for this build target.")
+  platform <- paste(os, cpu, sep = "_")
+}
 r_config <- function(name) {
   paste(run(file.path(R.home("bin"), "R"), c("CMD", "config", name),
             capture = TRUE), collapse = " ")

@@ -5,18 +5,25 @@ Version: 0.1.0.9000
 Authors@R: c(
     person("Sounkou Mahamane", "Toure", email = "sounkoutoure@gmail.com",
            role = c("aut", "cre")),
-    person("DuckDB contributors", role = "ctb",
+    person("Rick", "Beeloo", role = "cph",
+           comment = "Sassy library"),
+    person("Ragnar", "Groot Koerkamp", role = "cph",
+           comment = "Sassy library"),
+    person("Stichting DuckDB Foundation", role = "cph",
            comment = "Bundled C API headers and extension metadata tool"))
 Description: Builds and loads the 'ducksassy' DuckDB extension for approximate
-    text, DNA and CRISPR searches using the 'Sassy' Rust library. Search results
+    text, DNA and CRISPR searches using the 'Sassy' Rust library by Beeloo and
+    Groot Koerkamp (2026) <doi:10.1093/bioinformatics/btag244>. Search results
     compose with SQL filtering, joins and aggregation. FASTA and FASTQ readers
-    are supplied by 'Rduckhts'. This development package uses the DuckDB C API
-    v2 preview through 'duckdb.2.0.dev', available from DuckDB's R-universe.
+    are supplied by 'Rduckhts'. Loading the extension requires a DuckDB host
+    with C API v2 support.
 License: MIT + file LICENSE
+Copyright: See inst/LICENCE.note for bundled dependency authors and licenses.
 URL: https://github.com/RGenomicsETL/ducksassy
 BugReports: https://github.com/RGenomicsETL/ducksassy/issues
 Depends: R (>= 4.2.0)
-Imports: DBI, duckdb.2.0.dev (>= 1.99.99.9000.1699), Rduckhts (>= 1.5.2)
+Imports: DBI, duckdb, Rduckhts (>= 1.5.2)
+Suggests: duckdb.2.0.dev
 Additional_repositories: https://duckdb.r-universe.dev,
     https://rgenomicsetl.r-universe.dev
 SystemRequirements: Cargo, rustc (>= 1.91), CMake (>= 3.20), Python (>= 3),

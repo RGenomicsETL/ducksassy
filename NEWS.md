@@ -1,5 +1,12 @@
 # ducksassy 0.1.0-dev
 
+- Cache output-vector handles within each scalar chunk and refresh them when
+  buffers grow. Add resident-input upstream library, Rust C ABI and SQL timings
+  with complete hit comparisons.
+- Rducksassy has an evaluated README, a Sassy paper citation and selectable
+  DuckDB drivers. Package builds use bundled C API v2 headers without starting
+  an R DuckDB host.
+
 - Add Rducksassy with offline vendored Rust builds and DuckDB v2 preview
   connections. Include a BAM read-sequence CRISPR example and an upstream CLI
   timing baseline for the sequence benchmark.

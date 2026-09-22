@@ -7,12 +7,12 @@
 rducksassy_load(con)
 }
 \arguments{
-\item{con}{An existing DuckDB v2 preview DBI connection.}
+\item{con}{An existing DuckDB DBI connection with C API v2 support.}
 }
 \value{
 Invisibly, the supplied connection.
 }
 \description{
 Loads the package-built DuckHTS and Ducksassy extensions into an existing
-DuckDB v2 preview connection. The connection must permit unsigned extensions.
+DuckDB connection. The host must support C API v2 and permit unsigned extensions.
 }
