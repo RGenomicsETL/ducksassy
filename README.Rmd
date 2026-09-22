@@ -62,8 +62,7 @@ hit.
 
 The [measured workloads](benchmarks/sequence_search.md) include eight 23-base
 guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The timed
-comparisons are between Ducksassy's `scalar` and AVX2 backends, and between
-Ducksassy builds using Sassy 0.2.1 and 0.2.6. The upstream Sassy CLI is used to
+comparison is between Ducksassy's `scalar` and AVX2 backends. The upstream Sassy CLI is used to
 check CRISPR hits, **not** as a timed performance baseline. The timed SQL runs in
 a persistent DuckDB session and aggregates all hits; the CLI starts a separate
 process and writes TSV. A speed comparison needs matched output work and a
@@ -123,6 +122,23 @@ ORDER BY line_id, hit.text_start;
 
 The input can also be a CSV, Parquet file or any other DuckDB relation with a
 text column. ASCII matching is case-insensitive; it is not Unicode text search.
+
+For one long ASCII value, `sassy_grep` returns rows from a stateful scan. It
+searches overlapping 1 KiB regions and gives each match endpoint to one region.
+DuckDB can stop requesting regions once an outer `LIMIT` is satisfied:
+
+```sql
+SELECT text_start, text_end, cost, cigar
+FROM sassy_grep('error', 'error: ' || repeat('ready ', 100000), 1)
+LIMIT 1;
+```
+
+This table function accepts constant expressions, as DuckDB requires for table
+function arguments. It returns **all qualifying endpoints**, including nearby
+alternative alignments; `sassy_matches` defaults to rightmost local minima.
+The scalar function above still accepts a different text value on every row.
+DuckDB constructs the constant text argument before the scan starts, so
+`LIMIT` saves search work but does not avoid holding that argument in memory.
 
 ### Search a FASTA reference
 
@@ -278,19 +294,26 @@ search, and parallel searches can use more RAM at once. Ducksassy no longer
 rejects inputs by byte length or imposes a per-search hit cap. This does not
 make peak memory bounded.
 
-An outer SQL `LIMIT` limits rows returned by a query. The current scalar
-functions first compute all matches for one text value as a LIST, then DuckDB
-expands that LIST into rows. `LIMIT` may avoid work on later input rows, but it
-cannot stop the native search or bound its memory within one value. A real
-early-stop path would need a matcher that yields hits incrementally and a
-stateful DuckDB table function that emits them in batches.
+An outer SQL `LIMIT` limits rows returned by a query. The scalar functions first
+compute all matches for one text value as a LIST, then DuckDB expands that LIST
+into rows. `LIMIT` may avoid work on later input rows, but it cannot stop the
+native search or bound its memory within one value. `sassy_grep` is a separate
+ASCII table scan that searches one bounded region at a time; its output batches
+can stop after `LIMIT`. It does not yet accept a column from `read_fasta` or a
+general relation as its text argument.
+
+The scalar adapter borrows DuckDB's input string bytes for each synchronous
+search call. DuckHTS's `read_fasta` currently copies each parsed sequence into a
+DuckDB VARCHAR vector before this adapter sees it. Avoiding that materialization
+would require a reader/search scan that passes a record buffer directly to the
+matcher while keeping it alive through the search.
 
 The current DuckDB adapter still caps LIST output at 1,048,576 hits across a
 chunk and raises an error if it cannot materialize them. `sassy_count` and
 `sassy_contains` avoid LIST output and CIGAR strings, but currently still run the
 full native match. Splitting a long reference into regions can reduce memory per
 search, but the caller must restore reference coordinates and reconcile hits in
-overlapping regions; Ducksassy does not do that automatically.
+overlapping regions. `sassy_grep` does this for its ASCII all-endpoints scan.
 
 </details>
 

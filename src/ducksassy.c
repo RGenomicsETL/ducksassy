@@ -653,6 +653,288 @@ cleanup:
     return success;
 }
 
+/* One text value, searched in bounded pieces. DuckDB stops calling exec once
+ * an outer LIMIT is satisfied. Endpoints belong to exactly one 1024-byte core;
+ * the left overlap contains every possible alignment ending in that core. */
+#define GREP_CORE_BYTES 1024U
+#define GREP_OUTPUT_ROWS 1024U
+
+typedef enum {
+    GREP_TEXT_START,
+    GREP_TEXT_END,
+    GREP_COST,
+    GREP_CIGAR,
+    GREP_COLUMN_COUNT
+} grep_column;
+
+typedef struct {
+    duckdb_v2_value_handle pattern_value;
+    duckdb_v2_value_handle text_value;
+    sassy_c_slice pattern;
+    sassy_c_slice text;
+    uint32_t k;
+} grep_bind_data;
+
+typedef struct {
+    sassy_c_searcher *searcher;
+    sassy_c_result *result;
+    const sassy_c_hit *hits;
+    const uint8_t *cigars;
+    size_t hit_count;
+    size_t hit_index;
+    size_t core_begin;
+    size_t core_start;
+    size_t window_start;
+} grep_state;
+
+static void grep_bind_destroy(void *pointer) {
+    grep_bind_data *data = (grep_bind_data *)pointer;
+    if (data) {
+        (void)duckdb_v2_value_destroy(&data->pattern_value);
+        (void)duckdb_v2_value_destroy(&data->text_value);
+        free(data);
+    }
+}
+
+static void grep_state_destroy(void *pointer) {
+    grep_state *state = (grep_state *)pointer;
+    if (state) {
+        sassy_c_result_free(state->result);
+        sassy_c_searcher_free(state->searcher);
+        free(state);
+    }
+}
+
+static void grep_bind(duckdb_v2_table_function_bind_info_handle info,
+                      duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
+    duckdb_v2_error_info_handle detail = NULL;
+    duckdb_v2_value_handle pattern_value = NULL;
+    duckdb_v2_value_handle text_value = NULL;
+    duckdb_v2_value_handle k_value = NULL;
+    duckdb_v2_logical_type_handle types[GREP_COLUMN_COUNT] = {0};
+    grep_bind_data *data = NULL;
+    bool owned = false;
+    duckdb_v2_str pattern;
+    duckdb_v2_str text;
+    int64_t k = 0;
+    duckdb_v2_value_handle *arguments[] = {&pattern_value, &text_value, &k_value};
+    const char *names[GREP_COLUMN_COUNT] = {"text_start", "text_end", "cost", "cigar"};
+    const char *type_names[GREP_COLUMN_COUNT] = {"UBIGINT", "UBIGINT", "INTEGER", "VARCHAR"};
+    for (idx_t argument = 0; argument < 3; ++argument) {
+        DUCKDB_CALL(duckdb_v2_table_function_bind_get_arg_value(
+            info, argument, arguments[argument], &detail));
+        bool is_null = false;
+        DUCKDB_CALL(duckdb_v2_value_is_null(*arguments[argument], &is_null, &detail));
+        if (is_null) {
+            INPUT_ERROR("sassy_grep: arguments cannot be NULL");
+        }
+    }
+    DUCKDB_CALL(duckdb_v2_value_get_varchar(pattern_value, &pattern, &detail));
+    DUCKDB_CALL(duckdb_v2_value_get_varchar(text_value, &text, &detail));
+    DUCKDB_CALL(duckdb_v2_value_get_bigint(k_value, &k, &detail));
+    if (pattern.len == 0 || pattern.len > 4096 || k < 0 ||
+        (uint64_t)k >= pattern.len || k > UINT32_MAX) {
+        INPUT_ERROR("sassy_grep: pattern must contain 1..4096 bytes and 0 <= k < pattern length");
+    }
+    for (idx_t byte = 0; byte < pattern.len; ++byte) {
+        if ((unsigned char)pattern.ptr[byte] >= 128) {
+            INPUT_ERROR("sassy_grep: pattern must be ASCII");
+        }
+    }
+    data = (grep_bind_data *)calloc(1, sizeof(*data));
+    if (!data) {
+        INPUT_ERROR("sassy_grep: allocation failed");
+    }
+    data->pattern = (sassy_c_slice){(const uint8_t *)pattern.ptr, (size_t)pattern.len};
+    data->text = (sassy_c_slice){(const uint8_t *)text.ptr, (size_t)text.len};
+    data->k = (uint32_t)k;
+    data->pattern_value = pattern_value;
+    data->text_value = text_value;
+    pattern_value = NULL;
+    text_value = NULL;
+    for (idx_t i = 0; i < GREP_COLUMN_COUNT; ++i) {
+        DUCKDB_CALL(duckdb_v2_context_create_type_from_text(context, string_view(type_names[i]),
+                                                              &types[i], &detail));
+        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(
+            info, string_view(names[i]), types[i], &detail));
+    }
+    duckdb_v2_opaque opaque = {data, grep_bind_destroy, NULL};
+    DUCKDB_CALL(duckdb_v2_table_function_bind_set_bind_data(info, &opaque, &detail));
+    owned = true;
+cleanup:
+    if (!owned) {
+        grep_bind_destroy(data);
+    }
+    (void)duckdb_v2_value_destroy(&pattern_value);
+    (void)duckdb_v2_value_destroy(&text_value);
+    (void)duckdb_v2_value_destroy(&k_value);
+    for (idx_t i = 0; i < GREP_COLUMN_COUNT; ++i) {
+        (void)duckdb_v2_logical_type_destroy(&types[i]);
+    }
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+static void grep_init(duckdb_v2_table_function_init_global_info_handle info,
+                      duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
+    (void)context;
+    duckdb_v2_error_info_handle detail = NULL;
+    grep_state *state = (grep_state *)calloc(1, sizeof(*state));
+    bool owned = false;
+    if (!state) {
+        set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, "sassy_grep: allocation failed");
+        return;
+    }
+    if (sassy_c_searcher_new(SASSY_C_ASCII, 0, &state->searcher) != SASSY_C_OK) {
+        INPUT_ERROR(sassy_c_last_error());
+    }
+    duckdb_v2_opaque opaque = {state, grep_state_destroy, NULL};
+    DUCKDB_CALL(duckdb_v2_table_function_init_global_set_global_state(info, &opaque, &detail));
+    owned = true;
+cleanup:
+    if (!owned) {
+        grep_state_destroy(state);
+    }
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+/* Returns 1 for a loaded window, 0 at end of input, -1 on search failure. */
+static int grep_load_window(const grep_bind_data *data, grep_state *state,
+                            duckdb_v2_error_info_handle *error) {
+    if (state->core_start >= data->text.len) {
+        return 0;
+    }
+
+    const size_t overlap = data->pattern.len + data->k;
+    state->core_begin = state->core_start;
+    state->window_start = state->core_begin > overlap ? state->core_begin - overlap : 0;
+
+    const size_t remaining = data->text.len - state->core_begin;
+    const size_t core_length = remaining < GREP_CORE_BYTES ? remaining : GREP_CORE_BYTES;
+    const size_t core_end = state->core_begin + core_length;
+    const size_t right_remaining = data->text.len - core_end;
+    const size_t right_overlap = right_remaining < overlap ? right_remaining : overlap;
+    const size_t window_end = core_end + right_overlap;
+    sassy_c_slice window = {
+        data->text.data + state->window_start,
+        window_end - state->window_start
+    };
+    sassy_c_options options = {
+        .struct_size = sizeof(options),
+        .all_endpoints = 1,
+        .include_cigar = 1
+    };
+
+    if (sassy_c_search(state->searcher, data->pattern, window, data->k, &options,
+                       &state->result) != SASSY_C_OK) {
+        set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, sassy_c_last_error());
+        return -1;
+    }
+
+    size_t cigar_bytes = 0;
+    if (sassy_c_result_view(state->result, &state->hits, &state->hit_count,
+                            &state->cigars, &cigar_bytes) != SASSY_C_OK) {
+        set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, sassy_c_last_error());
+        return -1;
+    }
+    state->hit_index = 0;
+    state->core_start = core_end;
+    return 1;
+}
+
+static void grep_exec(duckdb_v2_table_function_exec_info_handle info,
+                      duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
+    (void)context;
+    duckdb_v2_error_info_handle detail = NULL;
+    grep_bind_data *data = NULL;
+    grep_state *state = NULL;
+    duckdb_v2_data_chunk_handle chunk = NULL;
+    duckdb_v2_vector_handle columns[GREP_COLUMN_COUNT] = {0};
+    void *output[GREP_COLUMN_COUNT] = {0};
+    duckdb_v2_arena_handle arena = NULL;
+    idx_t count = 0;
+    DUCKDB_CALL(duckdb_v2_table_function_exec_get_bind_data(info, (void **)&data, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_exec_get_global_state(info, (void **)&state, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_exec_get_output_chunk(info, &chunk, &detail));
+    if (!data || !state) {
+        INPUT_ERROR("sassy_grep: missing scan state");
+    }
+    for (idx_t i = 0; i < GREP_COLUMN_COUNT; ++i) {
+        DUCKDB_CALL(duckdb_v2_data_chunk_get_vector(chunk, i, &columns[i], &detail));
+        DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(columns[i], &output[i], &detail));
+    }
+    DUCKDB_CALL(duckdb_v2_vector_get_arena(columns[GREP_CIGAR], &arena, &detail));
+    while (count < GREP_OUTPUT_ROWS) {
+        if (state->result && state->hit_index == state->hit_count) {
+            sassy_c_result_free(state->result);
+            state->result = NULL;
+        }
+        if (!state->result) {
+            int loaded = grep_load_window(data, state, error);
+            if (loaded < 0) {
+                goto cleanup;
+            }
+            if (loaded == 0) {
+                break;
+            }
+        }
+        while (state->hit_index < state->hit_count && count < GREP_OUTPUT_ROWS) {
+            const sassy_c_hit *hit = &state->hits[state->hit_index++];
+            uint64_t end = hit->text_end + state->window_start;
+            if (end <= state->core_begin || end > state->core_start) {
+                continue;
+            }
+            ((uint64_t *)output[GREP_TEXT_START])[count] = hit->text_start + state->window_start;
+            ((uint64_t *)output[GREP_TEXT_END])[count] = end;
+            ((int32_t *)output[GREP_COST])[count] = hit->cost;
+            DUCKDB_CALL(write_bytes(arena, &((duckdb_v2_bytes *)output[GREP_CIGAR])[count],
+                                    state->cigars + hit->cigar_offset,
+                                    (size_t)hit->cigar_length, &detail));
+            count++;
+        }
+        if (count > 0) {
+            break;
+        }
+    }
+    DUCKDB_CALL(duckdb_v2_vector_set_size(columns[GREP_TEXT_START], count, &detail));
+cleanup:
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+static bool register_grep(duckdb_v2_extension_handle extension,
+                          duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
+    duckdb_v2_error_info_handle detail = NULL;
+    duckdb_v2_table_function_handle function = NULL;
+    duckdb_v2_function_signature_handle signature = NULL;
+    duckdb_v2_logical_type_handle types[2] = {0};
+    bool success = false;
+    DUCKDB_CALL(duckdb_v2_table_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_str name = string_view("sassy_grep");
+    DUCKDB_CALL(duckdb_v2_table_function_set_name(function, &name, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_get_signature(function, &signature, &detail));
+    DUCKDB_CALL(duckdb_v2_context_create_type_from_text(context, string_view("VARCHAR"),
+                                                          &types[0], &detail));
+    DUCKDB_CALL(duckdb_v2_context_create_type_from_text(context, string_view("BIGINT"),
+                                                          &types[1], &detail));
+    DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(
+        signature, string_view("pattern"), types[0], NULL, &detail));
+    DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(
+        signature, string_view("text"), types[0], NULL, &detail));
+    DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(
+        signature, string_view("k"), types[1], NULL, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_set_bind_callback(function, grep_bind, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_set_init_global_callback(function, grep_init, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_set_exec_callback(function, grep_exec, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_register(function, &detail));
+    success = true;
+cleanup:
+    for (idx_t i = 0; i < 2; ++i) {
+        (void)duckdb_v2_logical_type_destroy(&types[i]);
+    }
+    (void)duckdb_v2_table_function_destroy(&function);
+    (void)duckdb_v2_error_info_destroy(&detail);
+    return success;
+}
+
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
                             duckdb_v2_error_info_handle *error) {
     if (sassy_c_abi_version() != SASSY_C_ABI_VERSION) {
@@ -661,6 +943,9 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_v2_extension_handle extension, duckdb_v2_cont
         return;
     }
     if (!register_backend_info(extension, context, error)) {
+        return;
+    }
+    if (!register_grep(extension, context, error)) {
         return;
     }
     for (size_t index = 0; index < sizeof(operations) / sizeof(operations[0]); ++index) {

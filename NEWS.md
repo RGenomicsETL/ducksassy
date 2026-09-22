@@ -1,5 +1,11 @@
 # ducksassy 0.1.0-dev
 
+- Add `sassy_grep(pattern, text, k)` as an incremental ASCII table scan. SQL
+  `LIMIT` can stop searches after an output batch. Scalar searches still borrow
+  vector strings and materialize one complete result per input value.
+- Remove the old version timing comparison and its archived artifacts; the
+  benchmark now reports current scalar and AVX2 DuckDB runs only.
+
 - Use Sassy 0.2.6, including its native CRISPR N-content filtering. Public C ABI and SQL signatures are unchanged.
 
 - Add executed FASTA, CRISPR and relational benchmarks with one-/four-thread measurements, backend comparisons and upstream CRISPR validation.

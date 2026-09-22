@@ -1,5 +1,0 @@
-"backend","threads","guide_record_pairs","compared_hits","exact_multiset","constructed_exact_rows"
-"scalar",1,8,10,TRUE,262144
-"scalar",4,8,10,TRUE,262144
-"avx2",1,8,10,TRUE,262144
-"avx2",4,8,10,TRUE,262144

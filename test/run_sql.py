@@ -33,6 +33,21 @@ def main():
         completed = execute(cli, install + bootstrap + conformance)
         if completed.returncode:
             raise SystemExit(completed.stdout + completed.stderr)
+        # DuckDB must stop pulling the table scan after its first result.
+        # A full scan reaches the late non-ASCII byte and fails validation.
+        late_invalid = "'error' || repeat('x', 5000) || 'é'"
+        first_query = (
+            "SELECT CASE WHEN (SELECT text_start "
+            f"FROM sassy_grep('error', {late_invalid}, 0) LIMIT 1) = 0 "
+            "THEN true ELSE error('wrong first grep hit') END;"
+        )
+        first_hit = execute(cli, setup + bootstrap + first_query)
+        if first_hit.returncode:
+            raise AssertionError(f'LIMIT did not stop the grep scan: {first_hit.stdout}\n{first_hit.stderr}')
+        full_scan = execute(cli, setup + bootstrap +
+            f"SELECT * FROM sassy_grep('error', {late_invalid}, 0);")
+        if full_scan.returncode == 0 or 'invalid sequence alphabet' not in full_scan.stderr:
+            raise AssertionError('full grep scan did not reach the late invalid byte')
         errors = [
             ("SELECT sassy_matches('', 'ACGA', 0);", 'patterns must'),
             ("SELECT sassy_matches('ACGA', 'ACGA', -1);", 'nonnegative'),
