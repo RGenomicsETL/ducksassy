@@ -60,8 +60,13 @@ hit.
   column. Results stay in DuckDB for joins, counts and downstream queries.
 
 The [measured workloads](benchmarks/sequence_search.md) include eight 23-base
-guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The report
-records the inputs, output counts, host, thread count and elapsed times.
+guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The timed
+comparisons are between Ducksassy's `scalar` and AVX2 backends, and between
+Ducksassy builds using Sassy 0.2.1 and 0.2.6. The upstream Sassy CLI is used to
+check CRISPR hits, **not** as a timed performance baseline. The timed SQL runs in
+a persistent DuckDB session and aggregates all hits; the CLI starts a separate
+process and writes TSV. A speed comparison needs matched output work and a
+defined startup, threading and cache protocol. None has been measured here.
 
 ## Quick start
 
@@ -240,24 +245,31 @@ Independent DNA/RNA-bulge limits and positional penalties are not provided.
 </details>
 
 <details>
-<summary><b>Memory limits</b>: what gets buffered and how to raise the caps</summary>
+<summary><b>Memory and result limits</b>: cause, effect and options</summary>
 
-DuckHTS streams records through DuckDB chunks, and DuckDB schedules workers with
-separate native searchers. Sassy buffers the hits for each pattern/text pair.
+DuckHTS streams *records*, but Sassy searches one sequence against each pattern
+and can hold hits and scratch space before DuckDB receives the result. A long
+FASTA record is therefore still one large search. Separate DuckDB workers have
+separate native searchers, so parallel searches can increase peak native memory.
 
-- `max_text_bytes` defaults to 1 MiB per sequence.
-- `max_hits` defaults to 10,000 for value, FASTQ and table searches, and
-  1,000,000 for FASTA and CRISPR searches. It is checked after each pattern
-  search, so it limits returned hits, not intermediate allocations.
-- LIST output is capped at 1,048,576 hits per DuckDB chunk.
+- `max_text_bytes` rejects a sequence **before** search when it exceeds 1 MiB
+  by default. For a known long record, raise it in the call: the 4.6 Mb
+  benchmark uses `max_text_bytes := 8388608`. This permits the search; it does
+  not reserve or guarantee 8 MiB of memory.
+- `max_hits` limits the hits returned for one sequence and its pattern panel.
+  It defaults to 10,000 for value, FASTQ and table searches, or 1,000,000 for
+  FASTA and CRISPR searches. The check runs **after each pattern search**, so a
+  dense match set can consume native memory before it raises an error. Narrow
+  the search or raise the cap only if the larger result is useful.
+- DuckDB LIST output has a separate limit of 1,048,576 hits **across a chunk**.
+  If that limit is reached, search a smaller input or use `sassy_count` or
+  `sassy_contains` when individual hits are unnecessary.
 
-Limits raise errors; they never silently truncate output. Native allocations are
-not spillable and are not fully governed by DuckDB's `memory_limit`. Panels are
-searched pairwise.
-
-For a whole chromosome, budget native memory and raise `max_text_bytes`, or
-supply regions with an explicit coordinate map. Automatic window overlap and
-duplicate reconciliation are not provided.
+These limits raise errors rather than silently dropping hits. Native search
+allocations do not spill to disk and are not fully controlled by DuckDB's
+`memory_limit`. Splitting a long reference into regions can reduce per-search
+memory, but the caller must restore reference coordinates and reconcile hits in
+overlapping regions; Ducksassy does not do that automatically.
 
 </details>
 
