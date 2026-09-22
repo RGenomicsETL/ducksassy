@@ -414,8 +414,8 @@ unsafe extern "C" fn sassy_c_search(
     unsafe { sassy_c_search_many(searcher, &pattern, 1, text, k, options, out) }
 }
 
-/// CRISPR endpoint and N-content filtering follows Sassy 0.2.1 bin/crispr.rs
-/// (cda6b17092d9b7645d6d0fe11863947de0cd83dc), by Rick Beeloo and
+/// CRISPR endpoint and N-content filtering follows Sassy 0.2.6 bin/crispr.rs
+/// (fc1d4fb222018e6e805ff83fbb0b68a9ab95c20f), by Rick Beeloo and
 /// Ragnar Groot Koerkamp. See third_party/sassy/LICENSE.
 ///
 /// # Safety
@@ -485,8 +485,9 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
                 break;
             }
             let guide = unsafe { bytes(*span)? };
+            engine.set_max_n_frac(opts.max_n_frac);
             state.poisoned = true;
-            let mut matches = if opts.allow_pam_edits != 0 {
+            let matches = if opts.allow_pam_edits != 0 {
                 engine.search_all(guide, text, k as usize)
             } else {
                 engine.search_with_fn(guide, text, k as usize, true, |_, prefix, strand| {
@@ -503,15 +504,8 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
                         .all(|(&actual, &base)| Iupac::is_match(actual, base))
                 })
             };
-            matches.retain(|hit| {
-                let region = &text[hit.text_start..hit.text_end];
-                let n_count = region
-                    .iter()
-                    .filter(|&&base| matches!(base, b'N' | b'n'))
-                    .count();
-                n_count as f32 / region.len() as f32 <= opts.max_n_frac
-            });
             state.poisoned = false;
+            engine.set_max_n_frac(1.0);
             append_matches(&mut result, matches, index, &common)?;
         }
         unsafe {
@@ -861,6 +855,48 @@ mod tests {
             run_crispr(0, &[b"ACGTNGG", b"ACGTNGG"], b"ACGTAGG", 0, opts).0,
             LIMIT
         );
+    }
+    #[test]
+    fn crispr_n_filter_does_not_leak_to_ordinary_search() {
+        let mut searcher = ptr::null_mut();
+        assert_eq!(unsafe { sassy_c_searcher_new(2, 0, &mut searcher) }, 0);
+
+        let mut crispr_opts = crispr_options();
+        crispr_opts.max_n_frac = 0.0;
+        let guide = [span(b"ACGTNGG")];
+        let mut crispr_result = ptr::null_mut();
+        let crispr_code = unsafe {
+            sassy_c_crispr_search_many(
+                searcher,
+                guide.as_ptr(),
+                guide.len(),
+                span(b"ACGTNGG"),
+                0,
+                &crispr_opts,
+                &mut crispr_result,
+            )
+        };
+        let (code, hits, _) = unsafe { result_snapshot(crispr_code, crispr_result) };
+        assert_eq!(code, 0);
+        assert!(hits.is_empty());
+
+        let mut ordinary_result = ptr::null_mut();
+        let ordinary_code = unsafe {
+            sassy_c_search(
+                searcher,
+                span(b"ACGTNGG"),
+                span(b"ACGTNGG"),
+                0,
+                &options(),
+                &mut ordinary_result,
+            )
+        };
+        let (_, hits, _) = unsafe { result_snapshot(ordinary_code, ordinary_result) };
+        unsafe {
+            sassy_c_searcher_free(searcher);
+        }
+        assert_eq!(ordinary_code, 0);
+        assert_eq!(hits.len(), 1);
     }
     #[test]
     fn crispr_empty_and_short_targets() {

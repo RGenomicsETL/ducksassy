@@ -11,7 +11,7 @@ name = "sassy_c"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-sassy = { version = "=0.2.1", default-features = false }
+sassy = { version = "=0.2.6", default-features = false }
 
 [features]
 default = ["backend-scalar"]

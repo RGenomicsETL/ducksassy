@@ -51,12 +51,13 @@ measure_workload <- function(session, query, series, repetitions, reference) {
   list(observed = observed, measurements = do.call(rbind, measurements))
 }
 
-sequence_benchmark <- function(output, repetitions = 7L) {
+sequence_benchmark <- function(repetitions = 7L) {
   directory <- tempfile("ducksassy-sequence-workload-")
   dir.create(directory)
   on.exit(unlink(directory, recursive = TRUE), add = TRUE)
   input <- sequence_workload(directory)
   manifest <- jsonlite::fromJSON("ducksassy-package.json")
+  output <- file.path("benchmarks/data", paste0("sequence_search_", manifest$sassy_crate))
   extension <- normalizePath("build/ducksassy.duckdb_extension")
   extension_sha256 <- digest::digest(file = extension, algo = "sha256")
   driver_sha256 <- digest::digest(file = "benchmarks/sequence_search.R", algo = "sha256")
@@ -64,7 +65,7 @@ sequence_benchmark <- function(output, repetitions = 7L) {
   cli <- normalizePath(".deps/duckdb-build/duckdb")
   upstream <- normalizePath(".deps/sassy-target/release/sassy")
   source_revision <- system2("git", "rev-parse HEAD", stdout = TRUE)
-  native_dirty <- system2("git", c("diff", "--name-only", "HEAD", "--", "src", "include", "rust", "CMakeLists.txt"), stdout = TRUE)
+  native_dirty <- system2("git", c("diff", "--name-only", "HEAD", "--", "src", "include", "rust", "CMakeLists.txt", "ducksassy-package.json"), stdout = TRUE)
   stopifnot(length(native_dirty) == 0L)
   dir.create(output, recursive = TRUE, showWarnings = FALSE)
   old_backend <- Sys.getenv("SASSY_C_BACKEND", unset = NA_character_)

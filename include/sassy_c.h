@@ -90,7 +90,7 @@ int32_t sassy_c_search(sassy_c_searcher *searcher, sassy_c_slice pattern, sassy_
 int32_t sassy_c_search_many(sassy_c_searcher *searcher, const sassy_c_slice *patterns,
                             size_t n_patterns, sassy_c_slice text, uint32_t k,
                             const sassy_c_options *options, sassy_c_result **out);
-/* CRISPR uses an IUPAC searcher and Sassy 0.2.1 CLI endpoint-filter semantics.
+/* CRISPR uses an IUPAC searcher and Sassy 0.2.6 CLI endpoint-filter semantics.
  * Guides include a trailing PAM of pam_length >= 1; a panel shares identical
  * PAM suffix bytes. All qualifying endpoints are searched, with unit edit costs
  * over the complete guide including PAM. allow_pam_edits=0 applies the exact
