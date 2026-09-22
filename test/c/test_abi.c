@@ -32,14 +32,23 @@ int main(void) {
     sassy_c_result *second = NULL;
     assert(sassy_c_search(searcher, span("ACGA"), span("TTTTTTTT"), 0, &opts, &second) == 0);
     assert(hits[0].text_start == 2 && memcmp(cigars, "4=", 2) == 0);
-    sassy_c_result_free(second);
+    sassy_c_result_recycle(searcher, second);
+    assert(sassy_c_search(searcher, span("ACGA"), span("ACGA"), 0, &opts, &second) == 0);
+    assert(hits[0].text_start == 2 && memcmp(cigars, "4=", 2) == 0);
+    sassy_c_result_recycle(searcher, second);
     sassy_c_result_free(result);
     result = NULL;
     sassy_c_slice invalid = {NULL, 4};
     assert(sassy_c_search(searcher, invalid, span("ACGA"), 0, &opts, &result) == SASSY_C_INVALID);
     assert(result == NULL && strlen(sassy_c_last_error()) > 0);
+    assert(sassy_c_search(searcher, span("ACGA"), span("ACGA"), 0, &opts, &result) == 0);
+    assert(strlen(sassy_c_last_error()) == 0);
+    sassy_c_result_recycle(searcher, NULL);
     sassy_c_result_free(NULL);
     sassy_c_searcher_free(searcher);
+    assert(sassy_c_result_view(result, &hits, &n, &cigars, &nc) == 0);
+    assert(n == 1 && hits[0].text_start == 0 && nc == 2);
+    sassy_c_result_free(result);
     sassy_c_searcher_free(NULL);
 
     assert(sassy_c_searcher_new(SASSY_C_IUPAC, 1, &searcher) == SASSY_C_OK);
@@ -55,7 +64,7 @@ int main(void) {
     assert(sassy_c_result_view(result, &hits, &n, &cigars, &nc) == SASSY_C_OK);
     assert(n == 1 && hits[0].strand == 1 && hits[0].text_start == 2 && hits[0].text_end == 9);
     assert(nc == 2 && memcmp(cigars, "7=", 2) == 0);
-    sassy_c_result_free(result);
+    sassy_c_result_recycle(searcher, result);
     result = NULL;
     crispr.pam_length = 8;
     assert(sassy_c_crispr_search_many(searcher, guides, 1, span("ACGTAGG"), 0, &crispr, &result) ==

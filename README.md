@@ -57,6 +57,8 @@ hit.
 The [library and adapter comparison](benchmarks/adapter_overhead.md) measures
 direct upstream Sassy calls, the Rust C ABI and SQL over identical resident
 inputs, checking the complete hit multisets.
+The [buffer reuse measurements](benchmarks/buffer_reuse.md) report the current
+SQL overhead and the effect of reusing native result storage.
 
 The [measured workloads](benchmarks/sequence_search.md) include eight 23-base
 guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The timed
@@ -381,6 +383,11 @@ search call. DuckHTS’s `read_fasta` currently copies each parsed sequence into
 DuckDB VARCHAR vector before this adapter sees it. Avoiding that materialization
 would require a reader/search scan that passes a record buffer directly to the
 matcher while keeping it alive through the search.
+
+Each worker’s searcher reuses one result allocation, retaining hit and CIGAR
+buffer capacity between calls until the searcher is destroyed. Successful calls
+do not allocate an error string. C callers can return consumed results with
+`sassy_c_result_recycle()` or release them with `sassy_c_result_free()`.
 
 The DuckDB adapter caps LIST output at 1,048,576 hits across a
 chunk and raises an error if it cannot materialize them. `sassy_count` and

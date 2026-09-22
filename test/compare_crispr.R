@@ -27,7 +27,7 @@ main <- function() {
   guides <- c("ACGTNGG", "TTTTNGG", "ACGTNGG")
   requested_backend <- Sys.getenv("SASSY_C_BACKEND", "auto")
   if (!nzchar(requested_backend)) requested_backend <- "auto"
-  stopifnot(requested_backend %in% c("auto", "scalar", "avx2", "avx512", "neon"))
+  stopifnot(requested_backend %in% c("auto", "scalar", "avx2", "avx512", "neon", "wasm128"))
   output <- file.path("build/crispr-oracle", requested_backend)
   dir.create(output, recursive = TRUE, showWarnings = FALSE)
   guide_file <- file.path(output, "guides.txt")
@@ -50,7 +50,11 @@ main <- function() {
     stdout = backend_file, stderr = backend_log)
   if (status != 0L) stop("Backend inspection failed; see ", backend_log, call. = FALSE)
   backends <- jsonlite::fromJSON(backend_file)
-  stopifnot(nrow(backends) == 4L, sum(backends$selected) == 1L)
+  stopifnot(
+    setequal(backends$name, c("scalar", "avx2", "avx512", "neon", "wasm128")),
+    !anyDuplicated(backends$name),
+    sum(backends$selected) == 1L
+  )
   selected_backend <- backends$name[backends$selected]
   if (requested_backend != "auto") stopifnot(identical(selected_backend, requested_backend))
   keys <- c("guide", "text_id", "cost", "strand", "start", "end", "cigar")

@@ -53,7 +53,7 @@ static void run_search(sassy_c_backend expected) {
     assert(count == 1 && hits[0].text_start == 2 && hits[0].text_end == 6);
     assert(cigar_bytes == 2);
     assert(memcmp(cigars, "4=", cigar_bytes) == 0);
-    sassy_c_result_free(result);
+    sassy_c_result_recycle(searcher, result);
     result = (sassy_c_result *)(uintptr_t)1;
     assert(sassy_c_search(searcher, span(""), span("ACGA"), 0, &options, &result) ==
            SASSY_C_INVALID);

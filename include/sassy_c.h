@@ -102,6 +102,12 @@ int32_t sassy_c_crispr_search_many(sassy_c_searcher *searcher, const sassy_c_sli
 int32_t sassy_c_result_view(const sassy_c_result *result, const sassy_c_hit **hits, size_t *count,
                             const uint8_t **cigars, size_t *cigar_bytes);
 void sassy_c_result_free(sassy_c_result *result);
+/* Consume an owned result and retain its buffers for the searcher's next call.
+ * All views of this result become invalid. searcher must be live and exclusively
+ * accessible; result may be NULL. Each searcher retains at most one result, whose
+ * capacity is released when replaced or when the searcher is freed. Other owned
+ * results remain valid, including after the searcher is freed. */
+void sassy_c_result_recycle(sassy_c_searcher *searcher, sassy_c_result *result);
 
 #ifdef __cplusplus
 }

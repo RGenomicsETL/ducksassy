@@ -496,7 +496,7 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
             total_hits += batch.hit_count;
         }
         mark_valid(output_validity, row);
-        sassy_c_result_free(result);
+        sassy_c_result_recycle(*searcher, result);
         result = NULL;
     }
     // Capacity is private to this callback; expose only the initialized hits.
@@ -902,8 +902,10 @@ static void grep_exec(duckdb_v2_table_function_exec_info_handle info,
     DUCKDB_CALL(duckdb_v2_vector_get_arena(columns[GREP_CIGAR], &arena, &detail));
     while (count < GREP_OUTPUT_ROWS) {
         if (state->result && state->hit_index == state->hit_count) {
-            sassy_c_result_free(state->result);
+            sassy_c_result_recycle(state->searcher, state->result);
             state->result = NULL;
+            state->hits = NULL;
+            state->cigars = NULL;
         }
         if (!state->result) {
             int loaded = grep_load_window(data, state, error);

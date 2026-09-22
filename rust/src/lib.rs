@@ -15,7 +15,7 @@ const PANIC: i32 = 3;
 
 type Error = (i32, String);
 thread_local! {
-    static LAST_ERROR: RefCell<CString> = RefCell::new(CString::new("").unwrap());
+    static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
 }
 
 #[repr(C)]
@@ -69,8 +69,10 @@ pub struct SassySearcher {
     engine: Engine,
     alphabet: u32,
     poisoned: bool,
+    spare_result: Option<Box<SassyResult>>,
 }
 
+#[derive(Default)]
 pub struct SassyResult {
     hits: Vec<SassyHit>,
     cigars: Vec<u8>,
@@ -117,6 +119,7 @@ pub struct SassyCBackendTable {
         *mut usize,
     ) -> i32,
     pub result_free: unsafe extern "C" fn(*mut SassyResult),
+    pub result_recycle: unsafe extern "C" fn(*mut SassySearcher, *mut SassyResult),
 }
 
 fn invalid(message: &str) -> Error {
@@ -124,7 +127,7 @@ fn invalid(message: &str) -> Error {
 }
 
 fn guard(f: impl FnOnce() -> Result<(), Error>) -> i32 {
-    LAST_ERROR.with(|e| *e.borrow_mut() = CString::new("").unwrap());
+    LAST_ERROR.with(|e| *e.borrow_mut() = None);
     let outcome = catch_unwind(AssertUnwindSafe(f));
     let (code, message) = match outcome {
         Ok(Ok(())) => return 0,
@@ -135,7 +138,7 @@ fn guard(f: impl FnOnce() -> Result<(), Error>) -> i32 {
         ),
     };
     LAST_ERROR.with(|e| {
-        *e.borrow_mut() = CString::new(message.replace('\0', "\\0")).unwrap();
+        *e.borrow_mut() = Some(CString::new(message.replace('\0', "\\0")).unwrap());
     });
     code
 }
@@ -255,7 +258,10 @@ fn append_matches(
 
 /// Borrowed thread-local string, valid until the next fallible FFI call on this thread.
 extern "C" fn backend_last_error() -> *const c_char {
-    LAST_ERROR.with(|e| e.borrow().as_ptr())
+    LAST_ERROR.with(|e| match e.borrow().as_ref() {
+        Some(message) => message.as_ptr(),
+        None => c"".as_ptr(),
+    })
 }
 
 /// # Safety
@@ -289,6 +295,7 @@ unsafe extern "C" fn sassy_c_searcher_new(
                 engine,
                 alphabet,
                 poisoned: false,
+                spare_result: None,
             }));
         }
         Ok(())
@@ -333,10 +340,7 @@ unsafe extern "C" fn sassy_c_search_many(
         let opts = unsafe { &*options };
         let (state, patterns, text) =
             unsafe { search_inputs(searcher, patterns, n_patterns, text, k, opts)? };
-        let mut result = SassyResult {
-            hits: Vec::new(),
-            cigars: Vec::new(),
-        };
+        let mut result = state.spare_result.take().unwrap_or_default();
         if !text.is_empty() {
             for (i, p) in patterns.iter().enumerate() {
                 let pattern = unsafe { bytes(*p)? };
@@ -370,7 +374,7 @@ unsafe extern "C" fn sassy_c_search_many(
             }
         }
         unsafe {
-            *out = Box::into_raw(Box::new(result));
+            *out = Box::into_raw(result);
         }
         Ok(())
     })
@@ -449,10 +453,7 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
             }
         }
         let pam_complement = Iupac::complement(pam);
-        let mut result = SassyResult {
-            hits: Vec::new(),
-            cigars: Vec::new(),
-        };
+        let mut result = state.spare_result.take().unwrap_or_default();
         for (index, span) in guides.iter().enumerate() {
             if text.is_empty() {
                 break;
@@ -482,7 +483,7 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
             append_matches(&mut result, matches, index, &common)?;
         }
         unsafe {
-            *out = Box::into_raw(Box::new(result));
+            *out = Box::into_raw(result);
         }
         Ok(())
     })
@@ -535,6 +536,24 @@ unsafe extern "C" fn sassy_c_result_free(result: *mut SassyResult) {
     }
 }
 
+/// Return result storage to a searcher for its next search.
+///
+/// # Safety
+/// `searcher` must be live and exclusively accessible. `result` must be NULL or
+/// an owned result from this backend. This consumes the result and its views.
+unsafe extern "C" fn sassy_c_result_recycle(
+    searcher: *mut SassySearcher,
+    result: *mut SassyResult,
+) {
+    if result.is_null() {
+        return;
+    }
+    let mut result = unsafe { Box::from_raw(result) };
+    result.hits.clear();
+    result.cigars.clear();
+    unsafe { (*searcher).spare_result = Some(result) };
+}
+
 static BACKEND_TABLE: SassyCBackendTable = SassyCBackendTable {
     version: BACKEND_TABLE_VERSION,
     struct_size: std::mem::size_of::<SassyCBackendTable>() as u32,
@@ -546,6 +565,7 @@ static BACKEND_TABLE: SassyCBackendTable = SassyCBackendTable {
     crispr_search_many: sassy_c_crispr_search_many,
     result_view: sassy_c_result_view,
     result_free: sassy_c_result_free,
+    result_recycle: sassy_c_result_recycle,
 };
 
 #[cfg(feature = "backend-scalar")]
@@ -581,6 +601,149 @@ pub extern "C" fn sassy_c_backend_wasm128_get_table() -> *const SassyCBackendTab
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+    use std::ffi::CStr;
+
+    thread_local! {
+        static ALLOCATIONS: Cell<Option<usize>> = const { Cell::new(None) };
+    }
+
+    struct CountingAllocator;
+
+    fn record_allocation() {
+        let _ = ALLOCATIONS.try_with(|count| {
+            if let Some(value) = count.get() {
+                count.set(Some(value + 1));
+            }
+        });
+    }
+
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            record_allocation();
+            unsafe { System.alloc(layout) }
+        }
+
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            record_allocation();
+            unsafe { System.alloc_zeroed(layout) }
+        }
+
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            record_allocation();
+            unsafe { System.realloc(pointer, layout, size) }
+        }
+
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            unsafe { System.dealloc(pointer, layout) }
+        }
+    }
+
+    #[global_allocator]
+    static TEST_ALLOCATOR: CountingAllocator = CountingAllocator;
+
+    #[test]
+    fn successful_calls_clear_thread_local_errors_without_allocating() {
+        assert_eq!(guard(|| Err(invalid("parent error"))), INVALID);
+        std::thread::spawn(|| {
+            assert!(unsafe { CStr::from_ptr(backend_last_error()) }.is_empty());
+            assert_eq!(guard(|| Err(invalid("child error"))), INVALID);
+        })
+        .join()
+        .unwrap();
+        assert_eq!(
+            unsafe { CStr::from_ptr(backend_last_error()) }.to_bytes(),
+            b"parent error"
+        );
+
+        ALLOCATIONS.with(|count| count.set(Some(0)));
+        for _ in 0..100 {
+            assert_eq!(guard(|| Ok(())), 0);
+            assert!(unsafe { CStr::from_ptr(backend_last_error()) }.is_empty());
+        }
+        let allocations = ALLOCATIONS.with(|count| count.replace(None).unwrap());
+        assert_eq!(allocations, 0);
+    }
+
+    #[test]
+    fn recycled_empty_search_and_view_need_no_allocations() {
+        let mut searcher = ptr::null_mut();
+        let mut result = ptr::null_mut();
+        let opts = options();
+        unsafe {
+            assert_eq!(sassy_c_searcher_new(1, 0, &mut searcher), 0);
+            assert_eq!(
+                sassy_c_search(searcher, span(b"A"), span(b""), 0, &opts, &mut result),
+                0
+            );
+            sassy_c_result_recycle(searcher, result);
+            ALLOCATIONS.with(|count| count.set(Some(0)));
+            for _ in 0..100 {
+                result = ptr::null_mut();
+                assert_eq!(
+                    sassy_c_search(searcher, span(b"A"), span(b""), 0, &opts, &mut result),
+                    0
+                );
+                let (mut hits, mut count, mut cigars, mut bytes) = (ptr::null(), 0, ptr::null(), 0);
+                assert_eq!(
+                    sassy_c_result_view(result, &mut hits, &mut count, &mut cigars, &mut bytes),
+                    0
+                );
+                assert_eq!((count, bytes), (0, 0));
+                assert!(hits.is_null() && cigars.is_null());
+                sassy_c_result_recycle(searcher, result);
+            }
+            let allocations = ALLOCATIONS.with(|count| count.replace(None).unwrap());
+            sassy_c_searcher_free(searcher);
+            assert_eq!(allocations, 0);
+        }
+    }
+
+    #[test]
+    fn recycled_storage_retains_capacity_and_clears_results() {
+        let mut searcher = ptr::null_mut();
+        let mut result = ptr::null_mut();
+        let opts = options();
+        unsafe {
+            assert_eq!(sassy_c_searcher_new(0, 0, &mut searcher), 0);
+            assert_eq!(
+                sassy_c_search(
+                    searcher,
+                    span(b"ab"),
+                    span(b"abababab"),
+                    0,
+                    &opts,
+                    &mut result
+                ),
+                0
+            );
+            let hit_capacity = (*result).hits.capacity();
+            let cigar_capacity = (*result).cigars.capacity();
+            assert!(hit_capacity >= 4 && cigar_capacity >= 8);
+            sassy_c_result_recycle(searcher, result);
+            for text in [b"".as_slice(), b"zzzz".as_slice()] {
+                assert_eq!(
+                    sassy_c_search(searcher, span(b"ab"), span(text), 0, &opts, &mut result),
+                    0
+                );
+                assert!((*result).hits.is_empty() && (*result).cigars.is_empty());
+                assert_eq!((*result).hits.capacity(), hit_capacity);
+                assert_eq!((*result).cigars.capacity(), cigar_capacity);
+                sassy_c_result_recycle(searcher, result);
+            }
+            assert_eq!(
+                sassy_c_search(searcher, span(b"ab"), span(b"ab"), 0, &opts, &mut result),
+                0
+            );
+            let borrowed = &*result;
+            assert_eq!(borrowed.hits.len(), 1);
+            assert_eq!(borrowed.hits[0].cigar_offset, 0);
+            assert_eq!(borrowed.cigars, b"2=");
+            sassy_c_result_recycle(searcher, result);
+            sassy_c_searcher_free(searcher);
+        }
+    }
     fn span(s: &[u8]) -> SassySlice {
         SassySlice {
             data: s.as_ptr(),

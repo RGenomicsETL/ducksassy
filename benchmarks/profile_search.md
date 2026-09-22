@@ -13,6 +13,9 @@ The inputs are resident DuckDB tables. Timings include SQL execution, hit
 aggregation and persistent CLI/R exchange. Each query returns one summary row.
 R/DBI bulk result conversion and FASTA decompression are outside this experiment.
 
+The [buffer reuse measurements](buffer_reuse.md) evaluate result reuse and
+successful-call bookkeeping following this profile.
+
 ## Parallelism: enough balanced scan tasks matter
 
 | table    | threads | seconds | speedup |

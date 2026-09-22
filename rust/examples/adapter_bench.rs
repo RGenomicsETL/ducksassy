@@ -128,7 +128,7 @@ impl Engine {
                     }
                     Ok::<(), Box<dyn Error>>(())
                 })();
-                unsafe { (table.result_free)(result) };
+                unsafe { (table.result_recycle)(*searcher, result) };
                 consumed?;
                 continue;
             }

@@ -159,7 +159,7 @@ static bool sassy_c_backend_table_valid(const sassy_c_backend_table *table) {
            table->struct_size == sizeof(*table) && table->last_error != NULL &&
            table->searcher_new != NULL && table->searcher_free != NULL && table->search != NULL &&
            table->search_many != NULL && table->crispr_search_many != NULL &&
-           table->result_view != NULL && table->result_free != NULL;
+           table->result_view != NULL && table->result_free != NULL && table->result_recycle != NULL;
 }
 
 static bool sassy_c_backend_from_name(const char *name, sassy_c_backend *backend) {
@@ -374,5 +374,15 @@ void sassy_c_result_free(sassy_c_result *result) {
     const sassy_c_backend_table *table = sassy_c_backend_for_call();
     if (table != NULL) {
         table->result_free(result);
+    }
+}
+
+void sassy_c_result_recycle(sassy_c_searcher *searcher, sassy_c_result *result) {
+    if (result == NULL) {
+        return;
+    }
+    const sassy_c_backend_table *table = sassy_c_backend_for_call();
+    if (table != NULL) {
+        table->result_recycle(searcher, result);
     }
 }

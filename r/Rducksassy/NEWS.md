@@ -1,5 +1,7 @@
 # Rducksassy 0.1.0.9000
 
+- Reuse native result buffers between searches and avoid allocating error strings
+  on successful calls.
 - Build Ducksassy from bundled C and Rust sources during package installation.
 - Provide `rducksassy_connect()` and `rducksassy_load()` for SQL approximate
   text and sequence search with C API v2 hosts and DuckHTS readers. The

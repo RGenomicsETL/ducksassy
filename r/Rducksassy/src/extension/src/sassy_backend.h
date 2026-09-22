@@ -38,6 +38,7 @@ typedef struct {
     int32_t (*result_view)(const sassy_c_result *result, const sassy_c_hit **hits, size_t *count,
                            const uint8_t **cigars, size_t *cigar_bytes);
     void (*result_free)(sassy_c_result *result);
+    void (*result_recycle)(sassy_c_searcher *searcher, sassy_c_result *result);
 } sassy_c_backend_table;
 
 typedef const sassy_c_backend_table *(*sassy_c_backend_getter)(void);

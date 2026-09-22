@@ -1,5 +1,8 @@
 # ducksassy 0.1.0-dev
 
+- Reuse hit and CIGAR buffers per searcher and keep successful error bookkeeping
+  allocation-free. C callers can return consumed results with
+  `sassy_c_result_recycle()`; outstanding owned results keep independent lifetimes.
 - Cache output-vector handles within each scalar chunk and refresh them when
   buffers grow. Add resident-input upstream library, Rust C ABI and SQL timings
   with complete hit comparisons.
