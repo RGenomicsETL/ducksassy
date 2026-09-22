@@ -60,8 +60,9 @@ These are SQL end-to-end measurements, not isolated kernel timings.
 ## Comparison with earlier Ducksassy using Sassy 0.2.1
 
 The [recorded baseline report](https://github.com/RGenomicsETL/ducksassy/blob/00f37cacd21740c7740a8529e4a6745a18d5f602/benchmarks/sequence_search.md)
-uses the same host, DuckDB/DuckHTS artifacts, inputs, queries, affinity settings
-and repetition counts. Input derivation and complete result fingerprints agree.
+uses the same host, DuckDB/DuckHTS artifacts, inputs, query workload, affinity
+settings and repetition counts. Input derivation and complete result
+fingerprints agree; the parameter difference is noted below.
 Negative percentage changes indicate lower observed elapsed time.
 
 ```{r version-comparison}
