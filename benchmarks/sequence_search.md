@@ -4,46 +4,20 @@ Ducksassy sequence-search benchmarks
 ## Results
 
 Sassy **0.2.6**, Ducksassy
-**001a2b31784f66b4a92bd33ba7484c3438f6c114**, Intel Core i5-13500.
+**87653fda17a28498414b621bb1bd7a8aaea75ba4**, Intel Core i5-13500.
 Medians of seven measured queries after one warm-up; lower times are better.
 
-| workload   | threads | baseline_seconds | avx2_seconds | baseline_over_avx2 |
-|:-----------|--------:|-----------------:|-------------:|-------------------:|
-| crispr     |       1 |            0.155 |        0.096 |              1.615 |
-| crispr     |       4 |            0.155 |        0.096 |              1.615 |
-| fasta      |       1 |            0.097 |        0.091 |              1.066 |
-| fasta      |       4 |            0.097 |        0.091 |              1.066 |
-| relational |       1 |            0.972 |        0.926 |              1.050 |
-| relational |       4 |            0.459 |        0.433 |              1.060 |
+| workload   | threads | scalar_seconds | avx2_seconds | scalar_over_avx2 |
+|:-----------|--------:|---------------:|-------------:|-----------------:|
+| crispr     |       1 |          0.155 |        0.099 |            1.566 |
+| crispr     |       4 |          0.156 |        0.095 |            1.642 |
+| fasta      |       1 |          0.097 |        0.090 |            1.078 |
+| fasta      |       4 |          0.097 |        0.089 |            1.090 |
+| relational |       1 |          0.967 |        0.908 |            1.065 |
+| relational |       4 |          0.463 |        0.431 |            1.074 |
 
-The baseline backend is named `scalar` by Sassy and includes SSE2 on x86-64.
+The `scalar` backend includes SSE2 on x86-64.
 These are SQL end-to-end measurements, not isolated kernel timings.
-
-## Comparison with Sassy 0.2.1
-
-The [recorded baseline report](https://github.com/RGenomicsETL/ducksassy/blob/00f37cacd21740c7740a8529e4a6745a18d5f602/benchmarks/sequence_search.md)
-uses the same host, DuckDB/DuckHTS artifacts, inputs, queries, affinity settings
-and repetition counts. Input derivation and complete result fingerprints agree.
-Negative percentage changes indicate lower observed elapsed time.
-
-| workload   | backend | threads | elapsed_seconds.baseline | elapsed_seconds.current | change_percent |
-|:-----------|:--------|--------:|-------------------------:|------------------------:|---------------:|
-| crispr     | avx2    |       1 |                    0.097 |                   0.096 |         -1.031 |
-| crispr     | avx2    |       4 |                    0.098 |                   0.096 |         -2.041 |
-| crispr     | scalar  |       1 |                    0.156 |                   0.155 |         -0.641 |
-| crispr     | scalar  |       4 |                    0.154 |                   0.155 |          0.649 |
-| fasta      | avx2    |       1 |                    0.091 |                   0.091 |          0.000 |
-| fasta      | avx2    |       4 |                    0.092 |                   0.091 |         -1.087 |
-| fasta      | scalar  |       1 |                    0.096 |                   0.097 |          1.042 |
-| fasta      | scalar  |       4 |                    0.097 |                   0.097 |          0.000 |
-| relational | avx2    |       1 |                    0.933 |                   0.926 |         -0.750 |
-| relational | avx2    |       4 |                    0.446 |                   0.433 |         -2.915 |
-| relational | scalar  |       1 |                    0.969 |                   0.972 |          0.310 |
-| relational | scalar  |       4 |                    0.456 |                   0.459 |          0.658 |
-
-These are sequential runs, not interleaved paired measurements. Small differences
-are not established speedups or regressions; raw repetitions are retained for
-both versions. Resource limits and output materialization are unchanged.
 
 ## Workloads
 
@@ -69,8 +43,7 @@ These are computational workloads, not evaluated experimental guides.
 
 Every returned hit contributes to a count, edit-cost sum and fingerprint that
 includes its input-row and pattern indices. Each query returns one aggregate row;
-that is distinct from the output-hit denominator. Whole-reference searches set
-`max_text_bytes=8388608`, exceeding the current 1 MiB default.
+that is distinct from the output-hit denominator.
 
 ## Measurement conditions
 
@@ -119,7 +92,10 @@ guide, record, cost, strand, start, end and CIGAR. Every constructed relational
 row also contains the independently known exact hit `[64,87)`, `+`, `23=`;
 that is checked at `k=0` before timing. The `k=2` fingerprints detect backend/thread
 inconsistencies, not independent biological correctness. No disagreements are
-filtered out.
+filtered out. The upstream CLI is a correctness oracle here, not a timed
+performance baseline. It starts a process and writes TSV; the timed DuckDB
+queries use persistent sessions and aggregate all hits. No cross-tool speed
+ratio is claimed.
 
 ## Input preparation and reproduction
 
@@ -141,10 +117,9 @@ Requires Linux `taskset`, CPUs 16–19 in the allowed affinity set, and AVX2/POP
 - [Validation counts](data/sequence_search_0.2.6/oracle.csv)
 - [Artifact, input, compiler and runtime receipt](data/sequence_search_0.2.6/receipt.json)
 - [Query templates](data/sequence_search_0.2.6/queries.sql)
-- [Sassy 0.2.1 timings](data/sequence_search_0.2.1/timings.csv)
 - [Driver](sequence_search.R)
 
-Extension SHA-256: 5a7696ad453fe5d6d547cdc0c86b40cb6ae27414fbc9375d9c80e4e21feca803.
+Extension SHA-256: 7ae010f8547e09630d8c361b41df5d0e9e4610597def93fe3671b0a627394214.
 
 FASTA SHA-256: a0ca3984234be9bd174e1f4691f062cc2a1a7dc24fb5c76b7d2f523f79f0c27c;
 4699686 bytes.

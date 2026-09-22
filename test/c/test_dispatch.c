@@ -36,8 +36,6 @@ static void run_search(sassy_c_backend expected) {
         .all_endpoints = 0,
         .include_cigar = 1,
         .reserved = 0,
-        .max_hits = 1000,
-        .max_text_bytes = 1048576,
     };
     sassy_c_searcher *searcher = NULL;
     sassy_c_result *result = NULL;
@@ -88,6 +86,7 @@ static sassy_c_backend best_backend(void) {
         SASSY_C_BACKEND_AVX512,
         SASSY_C_BACKEND_AVX2,
         SASSY_C_BACKEND_NEON,
+        SASSY_C_BACKEND_WASM128,
         SASSY_C_BACKEND_SCALAR,
     };
     for (size_t i = 0; i < sizeof(order) / sizeof(order[0]); ++i) {
@@ -120,6 +119,7 @@ static void test_unavailable(void) {
         SASSY_C_BACKEND_AVX512,
         SASSY_C_BACKEND_AVX2,
         SASSY_C_BACKEND_NEON,
+        SASSY_C_BACKEND_WASM128,
     };
     for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
         sassy_c_backend_status value = status(candidates[i]);

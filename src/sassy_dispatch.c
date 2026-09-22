@@ -46,6 +46,8 @@ const char *sassy_c_backend_name(sassy_c_backend backend) {
         return "avx512";
     case SASSY_C_BACKEND_NEON:
         return "neon";
+    case SASSY_C_BACKEND_WASM128:
+        return "wasm128";
     default:
         return NULL;
     }
@@ -80,16 +82,29 @@ static bool sassy_c_cpu_has_neon(void) {
 #endif
 }
 
+/* WebAssembly SIMD is fixed when the module is validated; there is no runtime
+ * ISA probe. CMake only defines SASSY_C_HAVE_WASM128 when it compiled this
+ * translation unit with -msimd128. */
+static bool sassy_c_cpu_has_wasm128(void) {
+#if defined(__wasm_simd128__)
+    return true;
+#else
+    return false;
+#endif
+}
+
 static bool sassy_c_backend_compiled(sassy_c_backend backend) {
     switch (backend) {
     case SASSY_C_BACKEND_SCALAR:
-        return true;
+        return SASSY_C_HAVE_SCALAR != 0;
     case SASSY_C_BACKEND_AVX2:
         return SASSY_C_HAVE_AVX2 != 0;
     case SASSY_C_BACKEND_AVX512:
         return SASSY_C_HAVE_AVX512 != 0;
     case SASSY_C_BACKEND_NEON:
         return SASSY_C_HAVE_NEON != 0;
+    case SASSY_C_BACKEND_WASM128:
+        return SASSY_C_HAVE_WASM128 != 0;
     default:
         return false;
     }
@@ -105,6 +120,8 @@ static bool sassy_c_backend_supported(sassy_c_backend backend) {
         return sassy_c_cpu_has_avx512();
     case SASSY_C_BACKEND_NEON:
         return sassy_c_cpu_has_neon();
+    case SASSY_C_BACKEND_WASM128:
+        return sassy_c_cpu_has_wasm128();
     default:
         return false;
     }
@@ -112,8 +129,10 @@ static bool sassy_c_backend_supported(sassy_c_backend backend) {
 
 static sassy_c_backend_getter sassy_c_backend_getter_for(sassy_c_backend backend) {
     switch (backend) {
+#if SASSY_C_HAVE_SCALAR
     case SASSY_C_BACKEND_SCALAR:
         return sassy_c_backend_scalar_get_table;
+#endif
 #if SASSY_C_HAVE_AVX2
     case SASSY_C_BACKEND_AVX2:
         return sassy_c_backend_avx2_get_table;
@@ -125,6 +144,10 @@ static sassy_c_backend_getter sassy_c_backend_getter_for(sassy_c_backend backend
 #if SASSY_C_HAVE_NEON
     case SASSY_C_BACKEND_NEON:
         return sassy_c_backend_neon_get_table;
+#endif
+#if SASSY_C_HAVE_WASM128
+    case SASSY_C_BACKEND_WASM128:
+        return sassy_c_backend_wasm128_get_table;
 #endif
     default:
         return NULL;
@@ -155,6 +178,7 @@ static sassy_c_backend sassy_c_best_backend(void) {
         SASSY_C_BACKEND_AVX512,
         SASSY_C_BACKEND_AVX2,
         SASSY_C_BACKEND_NEON,
+        SASSY_C_BACKEND_WASM128,
         SASSY_C_BACKEND_SCALAR,
     };
     for (size_t i = 0; i < sizeof(order) / sizeof(order[0]); ++i) {

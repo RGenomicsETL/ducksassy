@@ -32,8 +32,6 @@ pub struct SassyOptions {
     pub all_endpoints: u32,
     pub include_cigar: u32,
     pub reserved: u32,
-    pub max_hits: u64,
-    pub max_text_bytes: u64,
 }
 
 #[repr(C)]
@@ -43,8 +41,6 @@ pub struct SassyCrisprOptions {
     pub pam_length: u32,
     pub allow_pam_edits: u32,
     pub include_cigar: u32,
-    pub max_hits: u64,
-    pub max_text_bytes: u64,
     pub max_n_frac: f32,
 }
 
@@ -173,12 +169,8 @@ fn validate_options(opts: &SassyOptions) -> Result<(), Error> {
         || opts.reserved != 0
         || opts.all_endpoints > 1
         || opts.include_cigar > 1
-        || opts.max_hits == 0
-        || opts.max_text_bytes == 0
     {
-        return Err(invalid(
-            "invalid options, structure size, flags, or zero resource limit",
-        ));
+        return Err(invalid("invalid options, structure size, or flags"));
     }
     Ok(())
 }
@@ -200,12 +192,6 @@ unsafe fn search_inputs<'a>(
         return Err((
             LIMIT,
             "at most 4096 patterns are supported per call".to_owned(),
-        ));
-    }
-    if text.len as u64 > opts.max_text_bytes {
-        return Err((
-            LIMIT,
-            "max_text_bytes exceeded before invoking Sassy".to_owned(),
         ));
     }
     let state = unsafe { &mut *searcher };
@@ -235,17 +221,6 @@ fn append_matches(
     pattern_idx: usize,
     opts: &SassyOptions,
 ) -> Result<(), Error> {
-    let new_len = result
-        .hits
-        .len()
-        .checked_add(matches.len())
-        .ok_or_else(|| (LIMIT, "hit count overflow".to_owned()))?;
-    if new_len as u64 > opts.max_hits {
-        return Err((
-            LIMIT,
-            "max_hits exceeded; result is not truncated".to_owned(),
-        ));
-    }
     result
         .hits
         .try_reserve(matches.len())
@@ -332,7 +307,7 @@ unsafe extern "C" fn sassy_c_searcher_free(searcher: *mut SassySearcher) {
 
 /// Searches a pattern panel against ONE complete text record. Input bytes are borrowed
 /// only for this call. The caller owns the returned result. This deliberately does not
-/// collect a relation of texts in Rust. `max_hits` limits output, not upstream scratch.
+/// collect a relation of texts in Rust.
 ///
 /// # Safety
 /// All pointers must obey the ownership and lifetime rules in include/sassy_c.h.
@@ -453,8 +428,6 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
             all_endpoints: 1,
             include_cigar: opts.include_cigar,
             reserved: 0,
-            max_hits: opts.max_hits,
-            max_text_bytes: opts.max_text_bytes,
         };
         let (state, guides, text) =
             unsafe { search_inputs(searcher, guides, guide_count, text, k, &common)? };
@@ -599,6 +572,12 @@ pub extern "C" fn sassy_c_backend_neon_get_table() -> *const SassyCBackendTable 
     &BACKEND_TABLE
 }
 
+#[cfg(feature = "backend-wasm128")]
+#[unsafe(no_mangle)]
+pub extern "C" fn sassy_c_backend_wasm128_get_table() -> *const SassyCBackendTable {
+    &BACKEND_TABLE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -614,8 +593,6 @@ mod tests {
             all_endpoints: 0,
             include_cigar: 1,
             reserved: 0,
-            max_hits: 1000,
-            max_text_bytes: 1 << 20,
         }
     }
     unsafe fn run(
@@ -670,8 +647,6 @@ mod tests {
             pam_length: 3,
             allow_pam_edits: 0,
             include_cigar: 1,
-            max_hits: 1000,
-            max_text_bytes: 1 << 20,
             max_n_frac: 0.2,
         }
     }
@@ -759,16 +734,6 @@ mod tests {
         );
     }
     #[test]
-    fn limits_fail_without_partial_results() {
-        let mut opts = options();
-        opts.max_text_bytes = 3;
-        assert_eq!(unsafe { run(1, 0, &[b"ACGA"], b"ACGA", 0, opts) }.0, LIMIT);
-        opts = options();
-        opts.max_hits = 1;
-        opts.all_endpoints = 1;
-        assert_eq!(unsafe { run(1, 0, &[b"A"], b"AAAA", 0, opts) }.0, LIMIT);
-    }
-    #[test]
     fn iupac_and_no_cigar() {
         let mut opts = options();
         opts.include_cigar = 0;
@@ -842,18 +807,19 @@ mod tests {
         }
     }
     #[test]
-    fn crispr_n_fraction_and_output_limit() {
+    fn crispr_n_fraction() {
         let mut opts = crispr_options();
         opts.max_n_frac = 0.0;
-        opts.max_hits = 1;
         let (code, hits, _) = run_crispr(0, &[b"ACGTNGG"], b"ACGTNGGACGTnGG", 0, opts);
         assert_eq!(code, 0);
         assert!(hits.is_empty());
         opts.max_n_frac = 1.0 / 7.0;
         assert_eq!(run_crispr(0, &[b"ACGTNGG"], b"ACGTnGG", 0, opts).1.len(), 1);
         assert_eq!(
-            run_crispr(0, &[b"ACGTNGG", b"ACGTNGG"], b"ACGTAGG", 0, opts).0,
-            LIMIT
+            run_crispr(0, &[b"ACGTNGG", b"ACGTNGG"], b"ACGTAGG", 0, opts)
+                .1
+                .len(),
+            2
         );
     }
     #[test]
@@ -937,8 +903,8 @@ mod tests {
     #[test]
     fn ffi_layout() {
         assert_eq!(std::mem::size_of::<SassyHit>(), 64);
-        assert_eq!(std::mem::size_of::<SassyOptions>(), 32);
-        assert_eq!(std::mem::size_of::<SassyCrisprOptions>(), 40);
-        assert_eq!(std::mem::offset_of!(SassyCrisprOptions, max_n_frac), 32);
+        assert_eq!(std::mem::size_of::<SassyOptions>(), 16);
+        assert_eq!(std::mem::size_of::<SassyCrisprOptions>(), 20);
+        assert_eq!(std::mem::offset_of!(SassyCrisprOptions, max_n_frac), 16);
     }
 }

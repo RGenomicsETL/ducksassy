@@ -7,9 +7,9 @@
 #include <stdio.h>
 #include <string.h>
 _Static_assert(sizeof(sassy_c_hit) == 64, "hit ABI layout");
-_Static_assert(sizeof(sassy_c_options) == 32, "options ABI layout");
-_Static_assert(sizeof(sassy_c_crispr_options) == 40, "CRISPR options ABI layout");
-_Static_assert(offsetof(sassy_c_crispr_options, max_n_frac) == 32, "N fraction ABI offset");
+_Static_assert(sizeof(sassy_c_options) == 16, "options ABI layout");
+_Static_assert(sizeof(sassy_c_crispr_options) == 20, "CRISPR options ABI layout");
+_Static_assert(offsetof(sassy_c_crispr_options, max_n_frac) == 16, "N fraction ABI offset");
 _Static_assert(offsetof(sassy_c_hit, cost) == 40, "cost ABI offset");
 _Static_assert(offsetof(sassy_c_hit, cigar_offset) == 48, "CIGAR ABI offset");
 static sassy_c_slice span(const char *s) {
@@ -20,7 +20,7 @@ int main(void) {
     assert(sassy_c_abi_version() == SASSY_C_ABI_VERSION);
     sassy_c_searcher *searcher = NULL;
     assert(sassy_c_searcher_new(SASSY_C_DNA, 0, &searcher) == SASSY_C_OK);
-    sassy_c_options opts = {sizeof(opts), 0, 1, 0, 1000, 1048576};
+    sassy_c_options opts = {sizeof(opts), 0, 1, 0};
     sassy_c_result *result = NULL;
     assert(sassy_c_search(searcher, span("ACGA"), span("TTACGATT"), 0, &opts, &result) == 0);
     const sassy_c_hit *hits = NULL;
@@ -47,8 +47,6 @@ int main(void) {
                                      .pam_length = 3,
                                      .allow_pam_edits = 0,
                                      .include_cigar = 1,
-                                     .max_hits = 1000,
-                                     .max_text_bytes = 1048576,
                                      .max_n_frac = 0.2f};
     sassy_c_slice guides[] = {span("ACGTNGG")};
     result = NULL;

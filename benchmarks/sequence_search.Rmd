@@ -17,31 +17,9 @@ summary <- aggregate(elapsed_seconds ~ workload + backend + threads, raw, median
 summary <- reshape(summary, idvar = c("workload", "threads"), timevar = "backend", direction = "wide")
 summary <- summary[order(summary$workload, summary$threads), ]
 summary <- data.frame(workload = summary$workload, threads = summary$threads,
-  baseline_seconds = summary$elapsed_seconds.scalar, avx2_seconds = summary$elapsed_seconds.avx2,
-  baseline_over_avx2 = summary$elapsed_seconds.scalar / summary$elapsed_seconds.avx2)
+  scalar_seconds = summary$elapsed_seconds.scalar, avx2_seconds = summary$elapsed_seconds.avx2,
+  scalar_over_avx2 = summary$elapsed_seconds.scalar / summary$elapsed_seconds.avx2)
 denominators <- unique(raw[c("workload", "input_records", "patterns_per_record", "input_bases", "searched_pair_bases", "output_hits", "aggregate_rows")])
-baseline_directory <- "benchmarks/data/sequence_search_0.2.1"
-baseline <- read.csv(file.path(baseline_directory, "timings.csv"),
-                     colClasses = c(output_hits = "character", fingerprint = "character"))
-baseline_receipt <- jsonlite::fromJSON(file.path(baseline_directory, "receipt.json"))
-stopifnot(isTRUE(all.equal(baseline_receipt$input, measurement$receipt$input)))
-for (field in c("sdk_revision", "duckhts_sha256", "cli_sha256", "repetitions", "warmups", "timing")) {
-  stopifnot(identical(baseline_receipt[[field]], measurement$receipt[[field]]))
-}
-keys <- c("workload", "backend", "threads")
-metrics <- c("cpus", "input_records", "patterns_per_record", "input_bases",
-             "searched_pair_bases", "output_hits", "aggregate_rows", "fingerprint")
-comparable <- merge(unique(raw[c(keys, metrics)]), unique(baseline[c(keys, metrics)]),
-                    by = keys, all = TRUE, suffixes = c(".current", ".baseline"))
-stopifnot(nrow(comparable) == 12L)
-for (metric in metrics) {
-  stopifnot(identical(as.character(comparable[[paste0(metric, ".current")]]),
-                      as.character(comparable[[paste0(metric, ".baseline")]])))
-}
-baseline_medians <- aggregate(elapsed_seconds ~ workload + backend + threads, baseline, median)
-current_medians <- aggregate(elapsed_seconds ~ workload + backend + threads, raw, median)
-comparison <- merge(baseline_medians, current_medians, by = keys, suffixes = c(".baseline", ".current"))
-comparison$change_percent <- 100 * (comparison$elapsed_seconds.current / comparison$elapsed_seconds.baseline - 1)
 ```
 
 ## Results
@@ -54,23 +32,8 @@ Medians of seven measured queries after one warm-up; lower times are better.
 knitr::kable(summary, digits = 3, row.names = FALSE)
 ```
 
-The baseline backend is named `scalar` by Sassy and includes SSE2 on x86-64.
+The `scalar` backend includes SSE2 on x86-64.
 These are SQL end-to-end measurements, not isolated kernel timings.
-
-## Comparison with Sassy 0.2.1
-
-The [recorded baseline report](https://github.com/RGenomicsETL/ducksassy/blob/00f37cacd21740c7740a8529e4a6745a18d5f602/benchmarks/sequence_search.md)
-uses the same host, DuckDB/DuckHTS artifacts, inputs, queries, affinity settings
-and repetition counts. Input derivation and complete result fingerprints agree.
-Negative percentage changes indicate lower observed elapsed time.
-
-```{r version-comparison}
-knitr::kable(comparison, digits = 3, row.names = FALSE)
-```
-
-These are sequential runs, not interleaved paired measurements. Small differences
-are not established speedups or regressions; raw repetitions are retained for
-both versions. Resource limits and output materialization are unchanged.
 
 ## Workloads
 
@@ -94,8 +57,7 @@ knitr::kable(denominators, row.names = FALSE)
 
 Every returned hit contributes to a count, edit-cost sum and fingerprint that
 includes its input-row and pattern indices. Each query returns one aggregate row;
-that is distinct from the output-hit denominator. Whole-reference searches set
-`max_text_bytes=8388608`, exceeding the current 1 MiB default.
+that is distinct from the output-hit denominator.
 
 ## Measurement conditions
 
@@ -126,7 +88,10 @@ guide, record, cost, strand, start, end and CIGAR. Every constructed relational
 row also contains the independently known exact hit `[64,87)`, `+`, `23=`;
 that is checked at `k=0` before timing. The `k=2` fingerprints detect backend/thread
 inconsistencies, not independent biological correctness. No disagreements are
-filtered out.
+filtered out. The upstream CLI is a correctness oracle here, not a timed
+performance baseline. It starts a process and writes TSV; the timed DuckDB
+queries use persistent sessions and aggregate all hits. No cross-tool speed
+ratio is claimed.
 
 ## Input preparation and reproduction
 
@@ -148,7 +113,6 @@ Requires Linux `taskset`, CPUs 16–19 in the allowed affinity set, and AVX2/POP
 - [Validation counts](`r paste0(data_directory, "/oracle.csv")`)
 - [Artifact, input, compiler and runtime receipt](`r paste0(data_directory, "/receipt.json")`)
 - [Query templates](`r paste0(data_directory, "/queries.sql")`)
-- [Sassy 0.2.1 timings](data/sequence_search_0.2.1/timings.csv)
 - [Driver](sequence_search.R)
 
 Extension SHA-256: `r measurement$receipt$extension_sha256`.

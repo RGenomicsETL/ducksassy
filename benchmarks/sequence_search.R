@@ -74,9 +74,9 @@ sequence_benchmark <- function(repetitions = 7L) {
   on.exit(for (session in sessions) if (session$is_alive()) session$kill(), add = TRUE)
 
   array_sql <- function(x) paste0("[", paste(sql_literal(x), collapse = ","), "]")
-  ordinary <- sprintf("SELECT 0::UBIGINT AS row_id, hit FROM sassy_panel_search_fasta(%s, %s, 2, alphabet := 'dna', max_text_bytes := 8388608)",
+  ordinary <- sprintf("SELECT 0::UBIGINT AS row_id, hit FROM sassy_panel_search_fasta(%s, %s, 2, alphabet := 'dna')",
                       sql_literal(input$fasta), array_sql(input$patterns))
-  crispr <- sprintf("SELECT 0::UBIGINT AS row_id, hit FROM sassy_crispr_panel_search_fasta(%s, %s, 2, max_text_bytes := 8388608)",
+  crispr <- sprintf("SELECT 0::UBIGINT AS row_id, hit FROM sassy_crispr_panel_search_fasta(%s, %s, 2)",
                    sql_literal(input$fasta), array_sql(input$guides))
   relational <- "SELECT row_id, UNNEST(sassy_matches(guide, sequence, 2, alphabet := 'dna')) AS hit FROM targets"
   hit_summary <- function(sql) paste0(

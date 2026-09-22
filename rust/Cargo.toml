@@ -19,6 +19,9 @@ backend-scalar = ["sassy/scalar"]
 backend-avx2 = []
 backend-avx512 = []
 backend-neon = []
+# ensure_simd only recognizes AVX2 and NEON.  wasm32 SIMD uses wide's
+# simd128 implementation, so opt into Sassy's portable fallback guard.
+backend-wasm128 = ["sassy/scalar"]
 
 [profile.release]
 lto = false

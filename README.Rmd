@@ -18,13 +18,14 @@ knitr::opts_chunk$set(
 
 # ducksassy
 
-Approximate DNA sequence search inside DuckDB.
+Approximate string matching inside DuckDB.
 
 [DuckHTS](https://github.com/RGenomicsETL/duckhts) exposes FASTA and FASTQ records
 as DuckDB relations. [Sassy](https://github.com/RagnarGrootKoerkamp/sassy) supplies
 the approximate matching kernel. ducksassy connects them: file searches return
 matches with edit cost, coordinates, strand and CIGAR alongside the input
 record's columns. Scalar functions search sequence values from any relation.
+They also search ordinary ASCII text columns, so fuzzy grep can be a SQL query.
 
 This follows DuckHTS's [composability model](https://github.com/RGenomicsETL/duckhts/blob/develop/ARCHITECTURE.md):
 the file reader and native matcher handle their respective mechanics; DuckDB
@@ -60,8 +61,14 @@ hit.
   column. Results stay in DuckDB for joins, counts and downstream queries.
 
 The [measured workloads](benchmarks/sequence_search.md) include eight 23-base
-guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The report
-records the inputs, output counts, host, thread count and elapsed times.
+guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The timed
+comparison is between Ducksassy's `scalar` and AVX2 backends. The upstream Sassy CLI is used to
+check CRISPR hits, **not** as a timed performance baseline. The timed SQL runs in
+a persistent DuckDB session and aggregates all hits; the CLI starts a separate
+process and writes TSV. A speed comparison needs matched output work and a
+defined startup, threading and cache protocol. None has been measured here.
+The 4.6 Mb input is one bacterial record; these results do not establish
+whole-human-genome throughput or peak memory use.
 
 ## Quick start
 
@@ -94,6 +101,44 @@ outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
 
 Every example below runs against the bundled
 [test fixtures](test/data/README.md) and is rendered live from this README.
+
+### Fuzzy grep over text rows
+
+Search a text column with one allowed edit. ASCII mode requires `rc := false`;
+matches return byte offsets within each value.
+
+```{sql ascii-grep}
+WITH lines(line_id, message) AS (
+    VALUES (1, 'error: disk full'),
+           (2, 'errot: disk full'),
+           (3, 'ready')
+)
+SELECT line_id, message, hit.text_start, hit.text_end, hit.cost
+FROM lines
+CROSS JOIN LATERAL unnest(sassy_matches('error', message, 1,
+    alphabet := 'ascii', rc := false)) AS matches(hit)
+ORDER BY line_id, hit.text_start;
+```
+
+The input can also be a CSV, Parquet file or any other DuckDB relation with a
+text column. ASCII matching is case-insensitive; it is not Unicode text search.
+
+For one long ASCII value, `sassy_grep` returns rows from a stateful scan. It
+searches overlapping 1 KiB regions and gives each match endpoint to one region.
+DuckDB can stop requesting regions once an outer `LIMIT` is satisfied:
+
+```sql
+SELECT text_start, text_end, cost, cigar
+FROM sassy_grep('error', 'error: ' || repeat('ready ', 100000), 1)
+LIMIT 1;
+```
+
+This table function accepts constant expressions, as DuckDB requires for table
+function arguments. It returns **all qualifying endpoints**, including nearby
+alternative alignments; `sassy_matches` defaults to rightmost local minima.
+The scalar function above still accepts a different text value on every row.
+DuckDB constructs the constant text argument before the scan starts, so
+`LIMIT` saves search work but does not avoid holding that argument in memory.
 
 ### Search a FASTA reference
 
@@ -240,24 +285,34 @@ Independent DNA/RNA-bulge limits and positional penalties are not provided.
 </details>
 
 <details>
-<summary><b>Memory limits</b>: what gets buffered and how to raise the caps</summary>
+<summary><b>Large inputs and SQL LIMIT</b>: current execution model</summary>
 
-DuckHTS streams records through DuckDB chunks, and DuckDB schedules workers with
-separate native searchers. Sassy buffers the hits for each pattern/text pair.
+DuckHTS streams *records*, but Sassy receives each whole sequence or text value
+and can allocate RAM for search state and matches. DuckDB's `memory_limit` does
+not fully count that RAM or move it to disk. A long input is still one large
+search, and parallel searches can use more RAM at once. Input length and hit
+count have no user-set caps; peak memory is unbounded.
 
-- `max_text_bytes` defaults to 1 MiB per sequence.
-- `max_hits` defaults to 10,000 for value, FASTQ and table searches, and
-  1,000,000 for FASTA and CRISPR searches. It is checked after each pattern
-  search, so it limits returned hits, not intermediate allocations.
-- LIST output is capped at 1,048,576 hits per DuckDB chunk.
+An outer SQL `LIMIT` limits rows returned by a query. The scalar functions first
+compute all matches for one text value as a LIST, then DuckDB expands that LIST
+into rows. `LIMIT` may avoid work on later input rows, but it cannot stop the
+native search or bound its memory within one value. `sassy_grep` is a separate
+ASCII table scan that searches one bounded region at a time; its output batches
+can stop after `LIMIT`. Table function arguments are constant expressions, so
+it cannot take a column from `read_fasta` or a general relation.
 
-Limits raise errors; they never silently truncate output. Native allocations are
-not spillable and are not fully governed by DuckDB's `memory_limit`. Panels are
-searched pairwise.
+The scalar adapter borrows DuckDB's input string bytes for each synchronous
+search call. DuckHTS's `read_fasta` currently copies each parsed sequence into a
+DuckDB VARCHAR vector before this adapter sees it. Avoiding that materialization
+would require a reader/search scan that passes a record buffer directly to the
+matcher while keeping it alive through the search.
 
-For a whole chromosome, budget native memory and raise `max_text_bytes`, or
-supply regions with an explicit coordinate map. Automatic window overlap and
-duplicate reconciliation are not provided.
+The DuckDB adapter caps LIST output at 1,048,576 hits across a
+chunk and raises an error if it cannot materialize them. `sassy_count` and
+`sassy_contains` avoid LIST output and CIGAR strings, but currently still run the
+full native match. Splitting a long reference into regions can reduce memory per
+search, but the caller must restore reference coordinates and reconcile hits in
+overlapping regions. `sassy_grep` does this for its ASCII all-endpoints scan.
 
 </details>
 
@@ -270,12 +325,15 @@ The native library selects the best available backend automatically:
 SELECT * FROM sassy_backend_info() ORDER BY name;
 ```
 
-Set `SASSY_C_BACKEND` to `auto`, `scalar`, `avx2`, `avx512` or `neon` before the
-first search to force one. The choice is fixed for the loaded library; an
-unavailable request returns an error, and changing it requires a fresh process.
+Set `SASSY_C_BACKEND` to `auto`, `scalar`, `avx2`, `avx512`, `neon` or `wasm128`
+before the first search to force one. The choice is fixed for the loaded
+library; an unavailable request returns an error, and changing it requires a
+fresh process.
 `scalar` follows Sassy's baseline and includes SSE2 on x86-64; SSE4.1 has no
 separate tier. Linux x86-64 baseline and AVX2 are tested; AVX-512 is compiled
-but unexecuted, and aarch64/NEON is unverified.
+but unexecuted, and aarch64/NEON is unverified. Emscripten builds select
+`wasm128` at compile time. CI typechecks the Rust wasm target; a linked
+DuckDB-Wasm extension has not been validated.
 
 </details>
 
