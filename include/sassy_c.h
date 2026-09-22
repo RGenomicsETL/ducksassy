@@ -23,6 +23,7 @@ typedef enum {
     SASSY_C_BACKEND_AVX2,
     SASSY_C_BACKEND_AVX512,
     SASSY_C_BACKEND_NEON,
+    SASSY_C_BACKEND_WASM128,
     SASSY_C_BACKEND_COUNT
 } sassy_c_backend;
 typedef struct {
@@ -73,10 +74,12 @@ typedef struct {
 uint32_t sassy_c_abi_version(void);
 const char *sassy_c_last_error(void); /* thread-local; next fallible call invalidates */
 const char *sassy_c_backend_name(sassy_c_backend backend); /* NULL for an unknown value. */
-/* Set SASSY_C_BACKEND=auto|scalar|avx2|avx512|neon before the first search call.
+/* Set SASSY_C_BACKEND=auto|scalar|avx2|avx512|neon|wasm128 before the first search call.
  * Selection (including an unavailable/unknown selection error) is fixed for the
  * loaded library. Each result and searcher uses that same backend throughout
- * its lifetime. Set out->struct_size=sizeof(*out); status queries do not select. */
+ * its lifetime. wasm128 is a compile-time WebAssembly SIMD requirement, so a
+ * wasm128 build always selects it. Set out->struct_size=sizeof(*out); status
+ * queries do not select. */
 int32_t sassy_c_backend_status_get(sassy_c_backend backend, sassy_c_backend_status *out);
 int32_t sassy_c_searcher_new(uint32_t alphabet, uint32_t rc, sassy_c_searcher **out);
 void sassy_c_searcher_free(sassy_c_searcher *searcher);

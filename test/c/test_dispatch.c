@@ -86,6 +86,7 @@ static sassy_c_backend best_backend(void) {
         SASSY_C_BACKEND_AVX512,
         SASSY_C_BACKEND_AVX2,
         SASSY_C_BACKEND_NEON,
+        SASSY_C_BACKEND_WASM128,
         SASSY_C_BACKEND_SCALAR,
     };
     for (size_t i = 0; i < sizeof(order) / sizeof(order[0]); ++i) {
@@ -118,6 +119,7 @@ static void test_unavailable(void) {
         SASSY_C_BACKEND_AVX512,
         SASSY_C_BACKEND_AVX2,
         SASSY_C_BACKEND_NEON,
+        SASSY_C_BACKEND_WASM128,
     };
     for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
         sassy_c_backend_status value = status(candidates[i]);

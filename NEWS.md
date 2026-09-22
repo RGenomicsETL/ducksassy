@@ -3,6 +3,8 @@
 - Add `sassy_grep(pattern, text, k)` as an incremental ASCII table scan. SQL
   `LIMIT` can stop searches after an output batch. Scalar searches borrow
   vector strings and materialize one complete result per input value.
+- Add a build-time wasm128 backend for Emscripten targets. The Rust wasm target
+  is typechecked in CI; a linked DuckDB-Wasm extension needs platform validation.
 
 - Use Sassy 0.2.6, including its native CRISPR N-content filtering. Public C ABI and SQL signatures are unchanged.
 

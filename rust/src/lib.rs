@@ -572,6 +572,12 @@ pub extern "C" fn sassy_c_backend_neon_get_table() -> *const SassyCBackendTable 
     &BACKEND_TABLE
 }
 
+#[cfg(feature = "backend-wasm128")]
+#[unsafe(no_mangle)]
+pub extern "C" fn sassy_c_backend_wasm128_get_table() -> *const SassyCBackendTable {
+    &BACKEND_TABLE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

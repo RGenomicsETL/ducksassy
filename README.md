@@ -373,19 +373,23 @@ The native library selects the best available backend automatically:
 SELECT * FROM sassy_backend_info() ORDER BY name;
 ```
 
-| name   | compiled | supported | selected |
-|--------|----------|-----------|----------|
-| avx2   | true     | true      | true     |
-| avx512 | true     | false     | false    |
-| neon   | false    | false     | false    |
-| scalar | true     | true      | false    |
+| name    | compiled | supported | selected |
+|---------|----------|-----------|----------|
+| avx2    | true     | true      | true     |
+| avx512  | true     | false     | false    |
+| neon    | false    | false     | false    |
+| scalar  | true     | true      | false    |
+| wasm128 | false    | false     | false    |
 
-Set `SASSY_C_BACKEND` to `auto`, `scalar`, `avx2`, `avx512` or `neon` before the
-first search to force one. The choice is fixed for the loaded library; an
-unavailable request returns an error, and changing it requires a fresh process.
+Set `SASSY_C_BACKEND` to `auto`, `scalar`, `avx2`, `avx512`, `neon` or `wasm128`
+before the first search to force one. The choice is fixed for the loaded
+library; an unavailable request returns an error, and changing it requires a
+fresh process.
 `scalar` follows Sassy’s baseline and includes SSE2 on x86-64; SSE4.1 has no
 separate tier. Linux x86-64 baseline and AVX2 are tested; AVX-512 is compiled
-but unexecuted, and aarch64/NEON is unverified.
+but unexecuted, and aarch64/NEON is unverified. Emscripten builds select
+`wasm128` at compile time. CI typechecks the Rust wasm target; a linked
+DuckDB-Wasm extension has not been validated.
 
 </details>
 <details>

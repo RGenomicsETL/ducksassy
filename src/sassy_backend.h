@@ -5,6 +5,9 @@
 
 #define SASSY_C_BACKEND_TABLE_VERSION 1U
 
+#ifndef SASSY_C_HAVE_SCALAR
+#define SASSY_C_HAVE_SCALAR 1
+#endif
 #ifndef SASSY_C_HAVE_AVX2
 #define SASSY_C_HAVE_AVX2 0
 #endif
@@ -13,6 +16,9 @@
 #endif
 #ifndef SASSY_C_HAVE_NEON
 #define SASSY_C_HAVE_NEON 0
+#endif
+#ifndef SASSY_C_HAVE_WASM128
+#define SASSY_C_HAVE_WASM128 0
 #endif
 
 typedef struct {
@@ -36,7 +42,9 @@ typedef struct {
 
 typedef const sassy_c_backend_table *(*sassy_c_backend_getter)(void);
 
+#if SASSY_C_HAVE_SCALAR
 const sassy_c_backend_table *sassy_c_backend_scalar_get_table(void);
+#endif
 #if SASSY_C_HAVE_AVX2
 const sassy_c_backend_table *sassy_c_backend_avx2_get_table(void);
 #endif
@@ -45,6 +53,9 @@ const sassy_c_backend_table *sassy_c_backend_avx512_get_table(void);
 #endif
 #if SASSY_C_HAVE_NEON
 const sassy_c_backend_table *sassy_c_backend_neon_get_table(void);
+#endif
+#if SASSY_C_HAVE_WASM128
+const sassy_c_backend_table *sassy_c_backend_wasm128_get_table(void);
 #endif
 
 #endif
