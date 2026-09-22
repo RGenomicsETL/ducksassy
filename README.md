@@ -170,7 +170,7 @@ searching them.
 
 ## Matching semantics
 
-Matching uses Sassy 0.2.1. Coordinates are **zero-based, half-open** in the input
+Matching uses Sassy 0.2.6. Coordinates are **zero-based, half-open** in the input
 text. `+` and `-` identify the pattern’s strand; reverse-strand CIGAR follows the
 pattern direction, not SAM direction.
 
@@ -210,7 +210,7 @@ DuckHTS streams records through DuckDB chunks; DuckDB schedules workers with
 separate native searchers. Sassy buffers hits for each pattern/text pair.
 
 `max_text_bytes` defaults to 1 MiB per sequence. `max_hits` defaults to 10,000 for
-general scalar searches and 1,000,000 for CRISPR and table helpers. It is checked
+ordinary value, FASTQ and table searches, and 1,000,000 for FASTA and CRISPR searches. It is checked
 after each pattern search: it limits returned hits, not intermediate allocations. LIST output is capped at 1,048,576 hits per
 DuckDB chunk. Limits raise errors rather than truncate output. Native allocations
 are not spillable and are not fully governed by DuckDB’s `memory_limit`.
@@ -254,6 +254,9 @@ make release
 .deps/duckdb-build/duckdb -unsigned -no-init
 ```
 
+On upgrades, move an outdated `.deps/sassy-source` checkout aside before rerunning
+`make setup`.
+
 In that CLI:
 
 ``` sql
@@ -272,6 +275,10 @@ The build also produces `build/libsassy_c.a` for direct C callers.
 [include/sassy_c.h](include/sassy_c.h) defines its ABI, ownership and limits;
 [test/c/test_abi.c](test/c/test_abi.c) provides an example.
 
+## Benchmarks
+
+[FASTA, CRISPR and relational search results](benchmarks/sequence_search.md).
+
 ## Development
 
 ``` sh
@@ -279,7 +286,7 @@ make test sql-test oracle-test readme
 ```
 
 The CRISPR comparison covers 36 profiles, 864 guide/record pairs and complete hit
-multisets against the Sassy 0.2.1 CLI. `make r-test` runs DBI integration with the
+multisets against the Sassy 0.2.6 CLI. `make r-test` runs DBI integration with the
 R preview host listed in `ducksassy-package.json`; that host is installed
 separately under `.deps/Rlib/`.
 

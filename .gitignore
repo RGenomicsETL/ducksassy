@@ -3,6 +3,7 @@
 /.deps/
 /.pi/
 /artifacts/
+/benchmarks/data/*/*.log
 __pycache__/
 *.duckdb
 *.duckdb.wal

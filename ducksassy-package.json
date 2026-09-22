@@ -13,8 +13,8 @@
     "revision": "191e68535c1f89c7c8fac370a49b54e4d8127bbf",
     "engine_revision": "bcff50365875c455f6c402c06838007f0ced9ca7"
   },
-  "sassy_crate": "0.2.1",
-  "sassy_source_revision": "cda6b17092d9b7645d6d0fe11863947de0cd83dc",
+  "sassy_crate": "0.2.6",
+  "sassy_source_revision": "fc1d4fb222018e6e805ff83fbb0b68a9ab95c20f",
   "duckdb_sdk_sha256": {
     "duckdb_v2.h": "0f134bd33f1ee1a511f21d5ad122213d5897320c301d5dca9d5fb24a658acd73",
     "duckdb_extension_v2.h": "0f69df71d9de3d1d707a95ff8403a6aebbde2e29077a035d201affe73b91cc2f"

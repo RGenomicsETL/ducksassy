@@ -1,4 +1,4 @@
-.PHONY: all setup setup-data sdk configure release test sql-test oracle-test r-test readme clean
+.PHONY: all setup setup-data sdk configure release test sql-test oracle-test r-test readme benchmarks clean
 BUILD_DIR ?= build
 DUCKDB_CAPI_DIR ?= $(CURDIR)/build/sdk
 JOBS ?= 2
@@ -30,5 +30,7 @@ r-test: release
 	$(R_RUN) test/run_sql.R
 readme: release
 	$(R_RUN) tools/render_readme.R
+benchmarks: release
+	$(R_RUN) tools/render_readme.R benchmarks/sequence_search.Rmd
 clean:
 	cmake -E rm -rf $(BUILD_DIR)
