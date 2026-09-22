@@ -290,17 +290,16 @@ Independent DNA/RNA-bulge limits and positional penalties are not provided.
 DuckHTS streams *records*, but Sassy receives each whole sequence or text value
 and can allocate RAM for search state and matches. DuckDB's `memory_limit` does
 not fully count that RAM or move it to disk. A long input is still one large
-search, and parallel searches can use more RAM at once. Ducksassy no longer
-rejects inputs by byte length or imposes a per-search hit cap. This does not
-make peak memory bounded.
+search, and parallel searches can use more RAM at once. Input length and hit
+count have no user-set caps; peak memory is unbounded.
 
 An outer SQL `LIMIT` limits rows returned by a query. The scalar functions first
 compute all matches for one text value as a LIST, then DuckDB expands that LIST
 into rows. `LIMIT` may avoid work on later input rows, but it cannot stop the
 native search or bound its memory within one value. `sassy_grep` is a separate
 ASCII table scan that searches one bounded region at a time; its output batches
-can stop after `LIMIT`. It does not yet accept a column from `read_fasta` or a
-general relation as its text argument.
+can stop after `LIMIT`. Table function arguments are constant expressions, so
+it cannot take a column from `read_fasta` or a general relation.
 
 The scalar adapter borrows DuckDB's input string bytes for each synchronous
 search call. DuckHTS's `read_fasta` currently copies each parsed sequence into a
@@ -308,7 +307,7 @@ DuckDB VARCHAR vector before this adapter sees it. Avoiding that materialization
 would require a reader/search scan that passes a record buffer directly to the
 matcher while keeping it alive through the search.
 
-The current DuckDB adapter still caps LIST output at 1,048,576 hits across a
+The DuckDB adapter caps LIST output at 1,048,576 hits across a
 chunk and raises an error if it cannot materialize them. `sassy_count` and
 `sassy_contains` avoid LIST output and CIGAR strings, but currently still run the
 full native match. Splitting a long reference into regions can reduce memory per
