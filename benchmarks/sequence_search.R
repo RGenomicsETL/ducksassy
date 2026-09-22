@@ -102,10 +102,10 @@ sequence_benchmark <- function(repetitions = 7L) {
   stopifnot(identical(upstream_source, manifest$sassy_source_revision))
   stopifnot(system2("git", c("-C", ".deps/sassy-source", "diff", "--quiet", "HEAD")) == 0L)
   upstream_log <- file.path(output, "crispr-upstream.log")
-  status <- system2(upstream, c("crispr", "--guide", shQuote(input$guide_file),
+  upstream_args <- c("-c", "19", shQuote(upstream), "crispr", "--guide", shQuote(input$guide_file),
     "--output", shQuote(oracle), "--threads", "1", "--k", "2", "--pam-length", "3", "--max-n-frac", "0.2",
-    shQuote(input$fasta)),
-    stdout = upstream_log, stderr = upstream_log)
+    shQuote(input$fasta))
+  status <- system2("taskset", upstream_args, stdout = upstream_log, stderr = upstream_log)
   if (status != 0L) stop("Upstream CRISPR failed: ", upstream_log, call. = FALSE)
   upstream_hits <- utils::read.delim(oracle, colClasses = "character", check.names = FALSE)
   stopifnot(all(keys %in% names(upstream_hits)))
@@ -116,6 +116,20 @@ sequence_benchmark <- function(repetitions = 7L) {
     x
   }
   upstream_hits <- normalize_hits(upstream_hits)
+  upstream_timings <- lapply(seq_len(repetitions), function(iteration) {
+    started <- proc.time()[["elapsed"]]
+    status <- system2("taskset", upstream_args, stdout = upstream_log, stderr = upstream_log)
+    elapsed <- proc.time()[["elapsed"]] - started
+    if (status != 0L) stop("Timed upstream CRISPR run failed", call. = FALSE)
+    observed <- utils::read.delim(oracle, colClasses = "character", check.names = FALSE)
+    if (!identical(normalize_hits(observed), upstream_hits)) {
+      stop("Timed upstream CRISPR result mismatch", call. = FALSE)
+    }
+    data.frame(iteration = iteration, elapsed_seconds = elapsed,
+               output_hits = nrow(observed), threads = 1L, cpus = "19")
+  })
+  upstream_timings <- do.call(rbind, upstream_timings)
+  utils::write.csv(upstream_timings, file.path(output, "upstream_timings.csv"), row.names = FALSE)
   workload_sizes <- data.frame(
     workload = c("fasta", "crispr", "relational"),
     input_records = c(1L, 1L, 262144L), patterns_per_record = c(8L, 8L, 1L),
@@ -201,7 +215,10 @@ sequence_benchmark <- function(repetitions = 7L) {
     rust = system2("rustc", "--version", stdout = TRUE), cc = system2("cc", "--version", stdout = TRUE),
     session = capture.output(sessionInfo()), input = input[setdiff(names(input), c("fasta", "guide_file"))],
     repetitions = repetitions, warmups = 1L,
+    upstream_timing = "R elapsed around taskset-pinned fresh Sassy CLI; includes startup, FASTA parsing, search and TSV output; validation excluded",
+    upstream_build = "make setup: cargo --release --features scalar, RUSTFLAGS=-C relocation-model=pic; baseline SSE2 on x86-64",
     timing = "R elapsed around persistent duckknit SQL call plus JSON result parsing; per-query whole-hit aggregate included")
   jsonlite::write_json(receipts, file.path(output, "receipt.json"), auto_unbox = TRUE, pretty = TRUE)
-  list(raw = raw, diagnostics = diagnostics, checks = checks, receipt = receipts, queries = queries)
+  list(raw = raw, upstream_timings = upstream_timings, diagnostics = diagnostics,
+       checks = checks, receipt = receipts, queries = queries)
 }

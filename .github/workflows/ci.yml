@@ -26,13 +26,13 @@ jobs:
           echo "revision=$(python3 -c 'import json; print(json.load(open("ducksassy-package.json"))["duckdb_sdk_revision"])')" >> "$GITHUB_OUTPUT"
       - name: Architecture checks
         run: python3 test/check_contract.py
-      - name: Stage locked Rust dependencies
-        run: cargo fetch --locked --manifest-path rust/Cargo.toml
+      - name: Configure bundled Rust dependencies
+        run: make configure
       - name: Type-check the wasm128 backend
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS: -C target-feature=+simd128
         run: >-
-          cargo check --locked --offline --manifest-path rust/Cargo.toml
+          cargo --config build/rust-vendor.toml check --frozen --manifest-path rust/Cargo.toml
           --target wasm32-unknown-emscripten --no-default-features
           --features backend-wasm128
       - name: Build C adapter and run the real C ABI test

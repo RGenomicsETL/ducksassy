@@ -1,5 +1,9 @@
 # ducksassy 0.1.0-dev
 
+- Add Rducksassy with offline vendored Rust builds and DuckDB v2 preview
+  connections. Include a BAM read-sequence CRISPR example and an upstream CLI
+  timing baseline for the sequence benchmark.
+
 - Add `sassy_grep(pattern, text, k)` as an incremental ASCII table scan. SQL
   `LIMIT` can stop searches after an output batch. Scalar searches borrow
   vector strings and materialize one complete result per input value.

@@ -1,0 +1,152 @@
+Rust dependencies bundled in vendor.tar.xz.
+Upstream license files are retained in each crate directory.
+
+arrayvec 0.7.8
+Authors: bluss
+License: MIT OR Apache-2.0
+Source: https://github.com/bluss/arrayvec
+
+bytemuck 1.25.2
+Authors: Lokathor <zefria@gmail.com>
+License: Zlib OR Apache-2.0 OR MIT
+Source: https://github.com/Lokathor/bytemuck
+
+crossbeam-deque 0.8.8
+Authors: See the bundled crate license files
+License: MIT OR Apache-2.0
+Source: https://github.com/crossbeam-rs/crossbeam
+
+crossbeam-epoch 0.9.21
+Authors: See the bundled crate license files
+License: MIT OR Apache-2.0
+Source: https://github.com/crossbeam-rs/crossbeam
+
+crossbeam-utils 0.8.23
+Authors: See the bundled crate license files
+License: MIT OR Apache-2.0
+Source: https://github.com/crossbeam-rs/crossbeam
+
+derivative 2.2.0
+Authors: mcarton <cartonmartin+git@gmail.com>
+License: MIT/Apache-2.0
+Source: https://github.com/mcarton/rust-derivative
+
+derive_more 2.1.1
+Authors: Jelte Fennema <github-tech@jeltef.nl>
+License: MIT
+Source: https://github.com/JelteF/derive_more
+
+derive_more-impl 2.1.1
+Authors: Jelte Fennema <github-tech@jeltef.nl>
+License: MIT
+Source: https://github.com/JelteF/derive_more
+
+either 1.18.0
+Authors: See the bundled crate license files
+License: MIT OR Apache-2.0
+Source: https://github.com/rayon-rs/either
+
+ensure_simd 0.1.0
+Authors: Ragnar Groot Koerkamp
+License: MIT
+Source: https://github.com/RagnarGrootKoerkamp/ensure_simd
+
+itertools 0.14.0
+Authors: bluss
+License: MIT OR Apache-2.0
+Source: https://github.com/rust-itertools/itertools
+
+log 0.4.34
+Authors: The Rust Project Developers
+License: MIT OR Apache-2.0
+Source: https://github.com/rust-lang/log
+
+memchr 2.8.3
+Authors: Andrew Gallant <jamslam@gmail.com>; bluss
+License: Unlicense OR MIT
+Source: https://github.com/BurntSushi/memchr
+
+pa-types 1.5.0
+Authors: Ragnar Groot Koerkamp; Daniel Liu
+License: MIT
+Source: https://github.com/pairwise-alignment/pa-types
+
+proc-macro2 1.0.107
+Authors: David Tolnay <dtolnay@gmail.com>; Alex Crichton <alex@alexcrichton.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/dtolnay/proc-macro2
+
+quote 1.0.47
+Authors: David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/dtolnay/quote
+
+rayon 1.12.0
+Authors: See the bundled crate license files
+License: MIT OR Apache-2.0
+Source: https://github.com/rayon-rs/rayon
+
+rayon-core 1.13.0
+Authors: See the bundled crate license files
+License: MIT OR Apache-2.0
+Source: https://github.com/rayon-rs/rayon
+
+rustc_version 0.4.1
+Authors: See the bundled crate license files
+License: MIT OR Apache-2.0
+Source: https://github.com/djc/rustc-version-rs
+
+safe_arch 1.2.0
+Authors: Lokathor <zefria@gmail.com>
+License: Zlib OR Apache-2.0 OR MIT
+Source: https://github.com/Lokathor/safe_arch
+
+sassy 0.2.6
+Authors: Rick Beeloo; Ragnar Groot Koerkamp
+License: MIT
+Source: https://github.com/RagnarGrootKoerkamp/sassy
+
+semver 1.0.28
+Authors: David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/dtolnay/semver
+
+serde 1.0.229
+Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/serde-rs/serde
+
+serde_core 1.0.229
+Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/serde-rs/serde
+
+serde_derive 1.0.229
+Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/serde-rs/serde
+
+syn 1.0.109
+Authors: David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/dtolnay/syn
+
+syn 2.0.119
+Authors: David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/dtolnay/syn
+
+syn 3.0.6
+Authors: David Tolnay <dtolnay@gmail.com>
+License: MIT OR Apache-2.0
+Source: https://github.com/dtolnay/syn
+
+unicode-ident 1.0.26
+Authors: David Tolnay <dtolnay@gmail.com>
+License: (MIT OR Apache-2.0) AND Unicode-3.0
+Source: https://github.com/dtolnay/unicode-ident
+
+wide 1.7.1
+Authors: Lokathor <zefria@gmail.com>
+License: Zlib OR Apache-2.0 OR MIT
+Source: https://github.com/Lokathor/wide

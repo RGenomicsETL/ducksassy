@@ -1,0 +1,31 @@
+[package]
+name = "sassy-c"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+license = "MIT"
+publish = false
+
+[lib]
+name = "sassy_c"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+sassy = { version = "=0.2.6", default-features = false }
+
+[features]
+default = ["backend-scalar"]
+backend-scalar = ["sassy/scalar"]
+backend-avx2 = []
+backend-avx512 = []
+backend-neon = []
+# ensure_simd only recognizes AVX2 and NEON.  wasm32 SIMD uses wide's
+# simd128 implementation, so opt into Sassy's portable fallback guard.
+backend-wasm128 = ["sassy/scalar"]
+
+[profile.release]
+lto = false
+codegen-units = 1
+panic = "unwind"
+
+[workspace]

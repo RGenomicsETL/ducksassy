@@ -1,0 +1,5 @@
+@HD	VN:1.6	SO:unsorted
+@SQ	SN:reference	LN:100
+forward	0	reference	1	60	7M	*	0	0	ACGTAGG	IIIIIII
+reverse	16	reference	20	60	7M	*	0	0	CCTACGT	IIIIIII
+secondary	256	reference	40	60	7M	*	0	0	ACGTAGG	IIIIIII

@@ -1,0 +1,6 @@
+^DESCRIPTION[.]in$
+^cran-comments[.]md$
+^src/ducksassy[.]duckdb_extension$
+^src/build$
+^src/extension/rust/target$
+^src/extension/build$

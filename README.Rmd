@@ -62,18 +62,17 @@ hit.
 
 The [measured workloads](benchmarks/sequence_search.md) include eight 23-base
 guides against a 4.6 Mb *E. coli* reference and 262,144 sequence rows. The timed
-comparison is between Ducksassy's `scalar` and AVX2 backends. The upstream Sassy CLI is used to
-check CRISPR hits, **not** as a timed performance baseline. The timed SQL runs in
-a persistent DuckDB session and aggregates all hits; the CLI starts a separate
-process and writes TSV. A speed comparison needs matched output work and a
-defined startup, threading and cache protocol. None has been measured here.
+comparison includes Ducksassy's `scalar` and AVX2 backends and an upstream
+Sassy CLI baseline for the same CRISPR workload. The report records startup,
+threading, output work and cache conditions: persistent SQL aggregates hits,
+while the upstream CLI starts a process and writes TSV.
 The 4.6 Mb input is one bacterial record; these results do not establish
 whole-human-genome throughput or peak memory use.
 
 ## Quick start
 
 ducksassy targets the DuckDB C API v2 preview (DuckDB 1.x cannot load it).
-`make setup` fetches the matching CLI and SDK. On Linux x86-64 you need C/C++
+`make setup` fetches the matching CLI and checks the bundled SDK. On Linux x86-64 you need C/C++
 compilers, CMake ≥ 3.20, Python ≥ 3.11, Git, R ≥ 4.1 and rustup.
 
 ```sh
@@ -96,6 +95,29 @@ database instance, so use a dedicated one. The macros are connection-scoped.
 Supported host versions are pinned in
 [ducksassy-package.json](ducksassy-package.json). When upgrading, move an
 outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
+
+### R package
+
+[`Rducksassy`](r/Rducksassy/README.md) builds the extension from bundled sources
+and provides `rducksassy_connect()` and `rducksassy_load()`. It uses the
+`duckdb.2.0.dev` preview host and the extension bundled by `Rduckhts`.
+Its examples include searching BAM read sequences while retaining alignment
+identifiers for SQL joins and summaries.
+
+```r
+install.packages("Rducksassy", repos = c(
+  "https://rgenomicsetl.r-universe.dev",
+  "https://duckdb.r-universe.dev",
+  "https://cloud.r-project.org"
+))
+con <- Rducksassy::rducksassy_connect()
+DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+`make vendor-rust` refreshes the shared Rust source archive using the committed
+lockfile. Native and R package builds use it offline. `make r-package` stages
+the R package's sources and builds its source tarball.
 
 ## Examples
 

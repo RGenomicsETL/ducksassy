@@ -35,6 +35,29 @@ knitr::kable(summary, digits = 3, row.names = FALSE)
 The `scalar` backend includes SSE2 on x86-64.
 These are SQL end-to-end measurements, not isolated kernel timings.
 
+## Upstream Sassy CLI baseline
+
+The upstream CLI searches the same FASTA and eight guides with the same CRISPR
+options, one thread and CPU 19. Every timed run is checked against the complete
+hit multiset. Both baseline builds use Sassy's scalar feature (SSE2 on x86-64).
+
+```{r upstream-timing}
+upstream_seconds <- median(measurement$upstream_timings$elapsed_seconds)
+sql_seconds <- median(subset(raw, workload == "crispr" & backend == "scalar" & threads == 1)$elapsed_seconds)
+knitr::kable(data.frame(
+  upstream_cli_seconds = upstream_seconds,
+  ducksassy_sql_seconds = sql_seconds,
+  sql_over_cli = sql_seconds / upstream_seconds
+), digits = 3, row.names = FALSE)
+```
+
+This ratio compares two complete application paths. Upstream includes process
+startup and writing TSV; Ducksassy uses a persistent session and aggregates every
+hit. Both include FASTA reading and searching. The difference includes those
+execution and output choices, so it does not isolate the C adapter's cost. Upstream
+TSV parsing and result validation happen outside its timer. A library-only timing
+would be needed to isolate the cost of validation, FFI and DuckDB result building.
+
 ## Workloads
 
 Input: RefSeq *E. coli* K-12 MG1655 **NC_000913.3**, **4,641,652 bases**,
@@ -88,10 +111,7 @@ guide, record, cost, strand, start, end and CIGAR. Every constructed relational
 row also contains the independently known exact hit `[64,87)`, `+`, `23=`;
 that is checked at `k=0` before timing. The `k=2` fingerprints detect backend/thread
 inconsistencies, not independent biological correctness. No disagreements are
-filtered out. The upstream CLI is a correctness oracle here, not a timed
-performance baseline. It starts a process and writes TSV; the timed DuckDB
-queries use persistent sessions and aggregate all hits. No cross-tool speed
-ratio is claimed.
+filtered out.
 
 ## Input preparation and reproduction
 
@@ -109,6 +129,7 @@ make benchmarks
 Requires Linux `taskset`, CPUs 16–19 in the allowed affinity set, and AVX2/POPCNT.
 
 - [Raw timings](`r paste0(data_directory, "/timings.csv")`)
+- [Upstream CLI timings](`r paste0(data_directory, "/upstream_timings.csv")`)
 - [Backend observations](`r paste0(data_directory, "/backends.csv")`)
 - [Validation counts](`r paste0(data_directory, "/oracle.csv")`)
 - [Artifact, input, compiler and runtime receipt](`r paste0(data_directory, "/receipt.json")`)

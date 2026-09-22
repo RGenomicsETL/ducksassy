@@ -7,3 +7,8 @@
 __pycache__/
 *.duckdb
 *.duckdb.wal
+/*.tar.gz
+/r/Rducksassy/src/build/
+/r/Rducksassy/src/ducksassy.duckdb_extension
+/r/Rducksassy/src/extension/rust/target/
+/*.Rcheck/

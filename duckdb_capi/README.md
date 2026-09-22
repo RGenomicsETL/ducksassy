@@ -1,9 +1,8 @@
 # DuckDB C API v2 SDK
 
-The v1 template headers have been removed. Run `make sdk` to fetch only
-`duckdb_v2.h` and `duckdb_extension_v2.h` at the revision pinned in
-`tools/fetch_sdk.py`, or point `DUCKDB_CAPI_DIR` at that checkout's
-`src/include` directory for an offline build.
+`duckdb_v2.h` and `duckdb_extension_v2.h` are bundled at the revision and
+checksums in `ducksassy-package.json`. `make sdk` verifies or refreshes them.
+Ordinary extension and R package builds use these local headers.
 
 The adapter explicitly compiles with `DUCKDB_V2_API_ALLOW_UNSTABLE=0` and
 `DUCKDB_V2_API_ALLOW_DEPRECATED=0`. Its metadata targets `C_STRUCT` / `v2.0.0`.

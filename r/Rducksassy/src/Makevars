@@ -1,0 +1,5 @@
+all:
+	@test -f ducksassy.duckdb_extension
+
+clean:
+	rm -f ducksassy.duckdb_extension
