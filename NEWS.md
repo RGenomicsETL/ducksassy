@@ -1,5 +1,7 @@
 # ducksassy 0.1.0-dev
 
+- Add executed FASTA, CRISPR and relational benchmarks with one-/four-thread measurements, backend comparisons and upstream CRISPR validation.
+
 - Fix DuckHTS setup downloads rejected with HTTP 403.
 - README examples lead with FASTA searches, CRISPR candidates and guide–target joins.
 

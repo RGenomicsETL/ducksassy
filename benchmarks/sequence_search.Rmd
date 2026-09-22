@@ -1,0 +1,118 @@
+---
+title: "Ducksassy sequence-search benchmarks"
+output:
+  github_document:
+    html_preview: false
+    pandoc_args: ["--wrap=preserve"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, error = FALSE)
+source("benchmarks/sequence_search.R")
+measurement <- sequence_benchmark("benchmarks/data/sequence_search_0.2.1")
+raw <- measurement$raw
+summary <- aggregate(elapsed_seconds ~ workload + backend + threads, raw, median)
+summary <- reshape(summary, idvar = c("workload", "threads"), timevar = "backend", direction = "wide")
+summary <- summary[order(summary$workload, summary$threads), ]
+summary <- data.frame(workload = summary$workload, threads = summary$threads,
+  baseline_seconds = summary$elapsed_seconds.scalar, avx2_seconds = summary$elapsed_seconds.avx2,
+  baseline_over_avx2 = summary$elapsed_seconds.scalar / summary$elapsed_seconds.avx2)
+denominators <- unique(raw[c("workload", "input_records", "patterns_per_record", "input_bases", "searched_pair_bases", "output_hits", "aggregate_rows")])
+```
+
+## Results
+
+Sassy **`r measurement$receipt$sassy_version`**, Ducksassy
+**`r measurement$receipt$source_revision`**, Intel Core i5-13500.
+Medians of seven measured queries after one warm-up; lower times are better.
+
+```{r results}
+knitr::kable(summary, digits = 3, row.names = FALSE)
+```
+
+The baseline backend is named `scalar` by Sassy and includes SSE2 on x86-64.
+These are SQL end-to-end measurements, not isolated kernel timings.
+
+## Workloads
+
+Input: RefSeq *E. coli* K-12 MG1655 **NC_000913.3**, **4,641,652 bases**,
+assembly GCF_000005845.2_ASM584v2. Eight 23-base patterns are selected at evenly
+distributed NGG sites. CRISPR guides replace the PAM's first base with N.
+These are computational workloads, not evaluated experimental guides.
+
+- **FASTA:** read the complete FASTA and search eight DNA patterns with `k=2`,
+  reverse complements and rightmost-local-minimum reporting.
+- **CRISPR:** read the same FASTA and search eight IUPAC guides with `k=2`, a
+  three-base exact PAM endpoint filter, reverse complements and `max_n_frac=0.2`.
+- **Relational:** scan 262,144 materialized rows containing deterministic
+  256-base reference windows. Each row has a 23-base guide copied from position
+  64 of its window (zero-based); search with `k=2` and reverse complements.
+  Overlapping/repeated source windows remain separate physical rows.
+
+```{r denominators}
+knitr::kable(denominators, row.names = FALSE)
+```
+
+Every returned hit contributes to a count, edit-cost sum and fingerprint that
+includes its input-row and pattern indices. Each query returns one aggregate row;
+that is distinct from the output-hit denominator. Whole-reference searches set
+`max_text_bytes=8388608`, exceeding the current 1 MiB default.
+
+## Measurement conditions
+
+Queries execute through persistent duckknit CLI sessions. Wall time includes SQL
+parsing, planning, execution, full-hit aggregation, CLI/R communication and JSON
+parsing. FASTA/CRISPR include file reading; relational input construction is
+excluded. Session startup, extension loading, staging and validation are excluded.
+Filesystem caches are warm. RSS and cold-start latency are not measured.
+
+Each backend/thread combination starts a fresh process under `taskset`.
+DuckDB is configured for one thread on CPU **19**, or four threads on CPUs
+**16–19**. All observed OS threads' affinity sets are verified; their count is
+reported separately from DuckDB's query-thread setting. A single-record FASTA
+does not supply four independent search tasks.
+
+```{r backends}
+knitr::kable(measurement$diagnostics, row.names = FALSE)
+```
+
+## Correctness checks
+
+```{r biological-check}
+knitr::kable(measurement$checks, row.names = FALSE)
+```
+
+CRISPR results match the separately built upstream CLI as complete multisets of
+guide, record, cost, strand, start, end and CIGAR. Every constructed relational
+row also contains the independently known exact hit `[64,87)`, `+`, `23=`;
+that is checked at `k=0` before timing. The `k=2` fingerprints detect backend/thread
+inconsistencies, not independent biological correctness. No disagreements are
+filtered out.
+
+## Input preparation and reproduction
+
+The driver resolves `genbank_ecoli_k12_gbff` through `duckhtsbench`'s registry,
+extracts its single ORIGIN sequence, verifies accession/alphabet/base count,
+and writes a temporary 80-column FASTA. The intermediate is regenerated for
+each render. Source acquisition stays with the existing registry.
+
+```sh
+make setup JOBS=4
+make setup-data
+make benchmarks
+```
+
+Requires Linux `taskset`, CPUs 16–19 in the allowed affinity set, and AVX2/POPCNT.
+The measured release is 0.2.1; Sassy 0.2.6 is not measured by this report.
+
+- [Raw timings](data/sequence_search_0.2.1/timings.csv)
+- [Backend observations](data/sequence_search_0.2.1/backends.csv)
+- [Validation counts](data/sequence_search_0.2.1/oracle.csv)
+- [Artifact, input, compiler and runtime receipt](data/sequence_search_0.2.1/receipt.json)
+- [Query templates](data/sequence_search_0.2.1/queries.sql)
+- [Driver](sequence_search.R)
+
+Extension SHA-256: `r measurement$receipt$extension_sha256`.
+
+FASTA SHA-256: `r measurement$receipt$input$fasta_sha256`;
+`r format(measurement$receipt$input$fasta_bytes, scientific = FALSE, trim = TRUE)` bytes.

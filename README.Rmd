@@ -227,6 +227,10 @@ The build also produces `build/libsassy_c.a` for direct C callers.
 [include/sassy_c.h](include/sassy_c.h) defines its ABI, ownership and limits;
 [test/c/test_abi.c](test/c/test_abi.c) provides an example.
 
+## Benchmarks
+
+[FASTA, CRISPR and relational search results](benchmarks/sequence_search.md).
+
 ## Development
 
 ```sh
