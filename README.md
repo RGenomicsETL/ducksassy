@@ -254,6 +254,9 @@ make release
 .deps/duckdb-build/duckdb -unsigned -no-init
 ```
 
+On upgrades, move an outdated `.deps/sassy-source` checkout aside before rerunning
+`make setup`.
+
 In that CLI:
 
 ``` sql
