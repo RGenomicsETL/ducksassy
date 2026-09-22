@@ -24,6 +24,9 @@ SELECT CASE WHEN sassy_count_many(['ACGA','ACGA'], 'TTACGATT', 0, rc := false) =
     THEN true ELSE error('duplicate panel IDs') END;
 SELECT CASE WHEN sassy_contains('ACGA'::BLOB, 'TTACGATT'::BLOB, 0, rc := false)
     THEN true ELSE error('BLOB overload') END;
+SELECT CASE WHEN sassy_contains('CGT', repeat('A', 1048576) || 'CGT', 0,
+                                alphabet := 'dna', rc := false)
+    THEN true ELSE error('long sequence search') END;
 
 -- Multiple chunks, changing inputs, filtering/dictionary candidates and NULLs.
 CREATE TEMP TABLE sequences AS

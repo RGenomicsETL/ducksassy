@@ -40,7 +40,7 @@ SELECT CASE WHEN sassy_crispr_matches('ACGTNGG'::BLOB, 'ACGTAGG'::BLOB, 0, rc :=
                  = sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, rc := false)
             THEN true ELSE error('CRISPR BLOB overload') END;
 SELECT CASE WHEN count(*) = 2 AND bool_and(parameters =
-    ['guide', 'text', 'k', 'pam_length', 'rc', 'allow_pam_edits', 'max_hits', 'max_text_bytes', 'max_n_frac'])
+    ['guide', 'text', 'k', 'pam_length', 'rc', 'allow_pam_edits', 'max_n_frac'])
     THEN true ELSE error('CRISPR native parameter contract') END
 FROM duckdb_functions() WHERE function_name = '__sassy_crispr_matches';
 

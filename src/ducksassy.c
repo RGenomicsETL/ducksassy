@@ -32,8 +32,6 @@ typedef enum {
     ARG_REVERSE_COMPLEMENT,
     ARG_ALL_ENDPOINTS,
     ARG_ALLOW_PAM_EDITS = ARG_ALL_ENDPOINTS,
-    ARG_MAX_HITS,
-    ARG_MAX_TEXT_BYTES,
     ARG_MAX_N_FRACTION,
     CRISPR_ARGUMENT_COUNT,
     SEARCH_ARGUMENT_COUNT = ARG_MAX_N_FRACTION
@@ -356,11 +354,8 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         }
 
         int64_t max_edits = integer_at(&views[ARG_MAX_EDITS], row);
-        int64_t max_hits = integer_at(&views[ARG_MAX_HITS], row);
-        int64_t max_text_bytes = integer_at(&views[ARG_MAX_TEXT_BYTES], row);
-        if (max_edits < 0 || (uint64_t)max_edits > UINT32_MAX || max_hits <= 0 ||
-            max_text_bytes <= 0) {
-            INPUT_ERROR("ducksassy: k must be nonnegative and resource limits must be positive");
+        if (max_edits < 0 || (uint64_t)max_edits > UINT32_MAX) {
+            INPUT_ERROR("ducksassy: k must be nonnegative");
         }
         uint32_t alphabet = SASSY_C_IUPAC;
         sassy_c_crispr_options crispr_options = {0};
@@ -378,8 +373,6 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
             crispr_options.pam_length = (uint32_t)pam_length;
             crispr_options.allow_pam_edits = boolean_at(&views[ARG_ALLOW_PAM_EDITS], row) ? 1U : 0U;
             crispr_options.include_cigar = 1;
-            crispr_options.max_hits = (uint64_t)max_hits;
-            crispr_options.max_text_bytes = (uint64_t)max_text_bytes;
             crispr_options.max_n_frac = (float)max_n_fraction;
         } else {
             sassy_c_slice label = byte_span(&views[ARG_ALPHABET], row);
@@ -402,9 +395,7 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         sassy_c_options options = {.struct_size = sizeof(options),
                                    .all_endpoints =
                                        boolean_at(&views[ARG_ALL_ENDPOINTS], row) ? 1U : 0U,
-                                   .include_cigar = output_hits ? 1U : 0U,
-                                   .max_hits = (uint64_t)max_hits,
-                                   .max_text_bytes = (uint64_t)max_text_bytes};
+                                   .include_cigar = output_hits ? 1U : 0U};
 
         sassy_c_slice text = byte_span(&views[ARG_TEXT], row);
         sassy_c_slice single_pattern;
@@ -504,8 +495,6 @@ static bool register_operation(duckdb_v2_extension_handle extension,
                                                 [ARG_ALPHABET] = "VARCHAR",
                                                 [ARG_REVERSE_COMPLEMENT] = "BOOLEAN",
                                                 [ARG_ALL_ENDPOINTS] = "BOOLEAN",
-                                                [ARG_MAX_HITS] = "BIGINT",
-                                                [ARG_MAX_TEXT_BYTES] = "BIGINT",
                                                 [ARG_MAX_N_FRACTION] = "DOUBLE"};
     const char *names[CRISPR_ARGUMENT_COUNT] = {[ARG_PATTERN] = "pattern",
                                                 [ARG_TEXT] = "text",
@@ -513,8 +502,6 @@ static bool register_operation(duckdb_v2_extension_handle extension,
                                                 [ARG_ALPHABET] = "alphabet",
                                                 [ARG_REVERSE_COMPLEMENT] = "rc",
                                                 [ARG_ALL_ENDPOINTS] = "all_endpoints",
-                                                [ARG_MAX_HITS] = "max_hits",
-                                                [ARG_MAX_TEXT_BYTES] = "max_text_bytes",
                                                 [ARG_MAX_N_FRACTION] = "max_n_frac"};
     uint32_t argument_count = SEARCH_ARGUMENT_COUNT;
     if (operation->kind == OP_CRISPR) {

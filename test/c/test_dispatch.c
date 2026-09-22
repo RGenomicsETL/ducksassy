@@ -36,8 +36,6 @@ static void run_search(sassy_c_backend expected) {
         .all_endpoints = 0,
         .include_cigar = 1,
         .reserved = 0,
-        .max_hits = 1000,
-        .max_text_bytes = 1048576,
     };
     sassy_c_searcher *searcher = NULL;
     sassy_c_result *result = NULL;

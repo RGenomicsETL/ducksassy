@@ -38,8 +38,6 @@ def main():
             ("SELECT sassy_matches('ACGA', 'ACGA', -1);", 'nonnegative'),
             ("SELECT sassy_matches('ACGA', 'NNNN', 0, alphabet := 'dna');", 'invalid sequence alphabet'),
             ("SELECT sassy_matches_many(['ACGA', NULL], 'ACGA', 0);", 'NULL elements'),
-            ("SELECT sassy_matches('ACGA', 'ACGA', 0, max_text_bytes := 3);", 'max_text_bytes'),
-            ("SELECT sassy_matches('A', 'AAAA', 0, rc := false, all_endpoints := true, max_hits := 1);", 'max_hits'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, pam_length := 0);", 'pam_length'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, pam_length := 8);", 'PAM length'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, max_n_frac := -0.1);", 'max_n_frac'),
@@ -47,7 +45,6 @@ def main():
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, max_n_frac := 'NaN'::DOUBLE);", 'max_n_frac'),
             ("SELECT sassy_crispr_matches_many(['ACGTNGG', 'ACGTNGA'], 'ACGTAGG', 0);", 'identical PAM'),
             ("SELECT sassy_crispr_matches_many(['ACGTNGG', NULL], 'ACGTAGG', 0);", 'NULL elements'),
-            ("SELECT sassy_crispr_matches_many(['ACGTNGG', 'ACGTNGG'], 'ACGTAGG', 0, rc := false, max_hits := 1);", 'max_hits'),
         ]
         for sql, expected in errors:
             failed = execute(cli, setup + bootstrap + sql)

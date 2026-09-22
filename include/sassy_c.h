@@ -31,15 +31,12 @@ typedef struct {
 } sassy_c_slice;
 typedef struct {
     uint32_t struct_size, all_endpoints, include_cigar, reserved;
-    uint64_t max_hits, max_text_bytes;
 } sassy_c_options;
 typedef struct {
     uint32_t struct_size;
     uint32_t pam_length;
     uint32_t allow_pam_edits;
     uint32_t include_cigar;
-    uint64_t max_hits;
-    uint64_t max_text_bytes;
     float max_n_frac;
 } sassy_c_crispr_options;
 typedef struct {
@@ -56,7 +53,7 @@ typedef struct {
     uint32_t selected;
 } sassy_c_backend_status;
 
-/* ABI 1: sizeof(options)=32, sizeof(hit)=64. Initialize reserved=0 and
+/* ABI 1: sizeof(options)=16, sizeof(hit)=64. Initialize reserved=0 and
  * struct_size=sizeof(sassy_c_options). Flags are 0/1, not ABI-dependent enums.
  * DNA/IUPAC inputs accept either case; ASCII uses literal bytes <128 (NUL allowed).
  * Empty texts/panels produce an empty result. Empty/NULL panel elements error.
@@ -67,8 +64,6 @@ typedef struct {
  * No matched-sequence copies. Inputs are borrowed only during synchronous calls.
  * Searchers must never be used concurrently. Separate searchers may run in parallel.
  * A SASSY_C_PANIC poisons that searcher; free and recreate it before another search.
- * max_text_bytes is checked before searching; max_hits is an OUTPUT limit checked
- * after each upstream pattern search, not a bound on upstream scratch allocations.
  * Every failure leaves a non-NULL out result slot set to NULL; no partial results.
  * NULL free is allowed. Free owned results/searchers exactly once via this library,
  * never via the caller's malloc/free. Results remain valid across subsequent searches.
@@ -96,8 +91,8 @@ int32_t sassy_c_search_many(sassy_c_searcher *searcher, const sassy_c_slice *pat
  * over the complete guide including PAM. allow_pam_edits=0 applies the exact
  * IUPAC PAM endpoint filter, not a separate constrained-alignment scoring model.
  * N/n content is filtered over the full target match, including PAM, with a
- * float32 fraction in [0,1]. max_hits counts retained matches after this filter.
- * sizeof(crispr_options)=40; struct_size and flags follow the rules above. */
+ * float32 fraction in [0,1]. sizeof(crispr_options)=20; struct_size and flags
+ * follow the rules above. */
 int32_t sassy_c_crispr_search_many(sassy_c_searcher *searcher, const sassy_c_slice *guides,
                                    size_t n_guides, sassy_c_slice text, uint32_t k,
                                    const sassy_c_crispr_options *options, sassy_c_result **out);

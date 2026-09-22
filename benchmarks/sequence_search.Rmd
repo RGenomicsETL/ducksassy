@@ -57,7 +57,7 @@ knitr::kable(summary, digits = 3, row.names = FALSE)
 The baseline backend is named `scalar` by Sassy and includes SSE2 on x86-64.
 These are SQL end-to-end measurements, not isolated kernel timings.
 
-## Comparison with Sassy 0.2.1
+## Comparison with earlier Ducksassy using Sassy 0.2.1
 
 The [recorded baseline report](https://github.com/RGenomicsETL/ducksassy/blob/00f37cacd21740c7740a8529e4a6745a18d5f602/benchmarks/sequence_search.md)
 uses the same host, DuckDB/DuckHTS artifacts, inputs, queries, affinity settings
@@ -70,7 +70,8 @@ knitr::kable(comparison, digits = 3, row.names = FALSE)
 
 These are sequential runs, not interleaved paired measurements. Small differences
 are not established speedups or regressions; raw repetitions are retained for
-both versions. Resource limits and output materialization are unchanged.
+both versions. The earlier queries passed an 8 MiB input-length cap; the current
+queries have no such parameter. Both materialize the same hit results.
 
 ## Workloads
 
@@ -94,8 +95,7 @@ knitr::kable(denominators, row.names = FALSE)
 
 Every returned hit contributes to a count, edit-cost sum and fingerprint that
 includes its input-row and pattern indices. Each query returns one aggregate row;
-that is distinct from the output-hit denominator. Whole-reference searches set
-`max_text_bytes=8388608`, exceeding the current 1 MiB default.
+that is distinct from the output-hit denominator.
 
 ## Measurement conditions
 
@@ -126,7 +126,10 @@ guide, record, cost, strand, start, end and CIGAR. Every constructed relational
 row also contains the independently known exact hit `[64,87)`, `+`, `23=`;
 that is checked at `k=0` before timing. The `k=2` fingerprints detect backend/thread
 inconsistencies, not independent biological correctness. No disagreements are
-filtered out.
+filtered out. The upstream CLI is a correctness oracle here, not a timed
+performance baseline. It starts a process and writes TSV; the timed DuckDB
+queries use persistent sessions and aggregate all hits. No cross-tool speed
+ratio is claimed.
 
 ## Input preparation and reproduction
 
