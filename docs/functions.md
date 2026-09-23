@@ -2,6 +2,8 @@
 
 Generated from `functions.yaml` by `scripts/render_function_catalog.py`.
 
+Scalar options are positional: the stable C extension API has no named scalar arguments, so `alphabet := 'dna'` does not bind. Pass options in the order shown and omit trailing ones to use their defaults, for example `sassy_matches('ACGT', text, 1, 'dna', false)`.
+
 ## Search
 
 | Function | Kind | Description |
@@ -36,7 +38,8 @@ Return every approximate match of one pattern in a text with at most k edits. `a
 Signature:
 
 ```sql
-sassy_matches(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false[, cigar_format := 'text']]]])
+sassy_matches(pattern, text, k[, alphabet[, rc[, all_endpoints[, cigar_format]]]])
+-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false, cigar_format = 'text'
 ```
 
 Returns:
@@ -69,7 +72,8 @@ Search a panel of up to 4096 patterns in one text. Each hit carries the zero-bas
 Signature:
 
 ```sql
-sassy_matches_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false[, cigar_format := 'text']]]])
+sassy_matches_many(patterns, text, k[, alphabet[, rc[, all_endpoints[, cigar_format]]]])
+-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false, cigar_format = 'text'
 ```
 
 Returns:
@@ -94,7 +98,8 @@ Count the matches `sassy_matches` would return, without building CIGAR strings.
 Signature:
 
 ```sql
-sassy_count(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])
+sassy_count(pattern, text, k[, alphabet[, rc[, all_endpoints]]])
+-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false
 ```
 
 Returns:
@@ -118,7 +123,8 @@ Count the matches of every pattern in a panel, without building CIGAR strings.
 Signature:
 
 ```sql
-sassy_count_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])
+sassy_count_many(patterns, text, k[, alphabet[, rc[, all_endpoints]]])
+-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false
 ```
 
 Returns:
@@ -142,7 +148,8 @@ Return whether the text contains at least one match of the pattern with at most 
 Signature:
 
 ```sql
-sassy_contains(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])
+sassy_contains(pattern, text, k[, alphabet[, rc[, all_endpoints]]])
+-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false
 ```
 
 Returns:
@@ -166,7 +173,8 @@ Return whether any pattern in the panel matches the text with at most k edits.
 Signature:
 
 ```sql
-sassy_contains_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])
+sassy_contains_many(patterns, text, k[, alphabet[, rc[, all_endpoints]]])
+-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false
 ```
 
 Returns:
@@ -218,7 +226,8 @@ Find guide occurrences with at most k edits over the whole guide, including its 
 Signature:
 
 ```sql
-sassy_crispr_matches(guide, text, k[, pam_length := 3[, allow_pam_edits := false[, max_n_frac := 0.2[, rc := true]]]])
+sassy_crispr_matches(guide, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])
+-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true
 ```
 
 Returns:
@@ -242,7 +251,8 @@ Search a guide panel sharing the same PAM suffix; each hit carries the guide's z
 Signature:
 
 ```sql
-sassy_crispr_matches_many(guides, text, k[, pam_length := 3[, allow_pam_edits := false[, max_n_frac := 0.2[, rc := true]]]])
+sassy_crispr_matches_many(guides, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])
+-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true
 ```
 
 Returns:

@@ -52,7 +52,7 @@
       "name": "sassy_matches",
       "kind": "scalar",
       "category": "Search",
-      "signature": "sassy_matches(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false[, cigar_format := 'text']]]])",
+      "signature": "sassy_matches(pattern, text, k[, alphabet[, rc[, all_endpoints[, cigar_format]]]])\n-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false, cigar_format = 'text'",
       "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]",
       "description": "Return every approximate match of one pattern in a text with at most k edits. `alphabet` is 'dna', 'iupac' or 'ascii'; `rc` also searches the reverse complement; `all_endpoints` reports every qualifying endpoint instead of Sassy's rightmost local minima; `cigar_format` is 'text', 'packed' or 'both'.",
       "examples": [
@@ -65,7 +65,7 @@
       "name": "sassy_matches_many",
       "kind": "scalar",
       "category": "Search",
-      "signature": "sassy_matches_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false[, cigar_format := 'text']]]])",
+      "signature": "sassy_matches_many(patterns, text, k[, alphabet[, rc[, all_endpoints[, cigar_format]]]])\n-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false, cigar_format = 'text'",
       "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]",
       "description": "Search a panel of up to 4096 patterns in one text. Each hit carries the zero-based `pattern_idx` of the panel entry that produced it, so duplicate patterns stay distinct.",
       "examples": [
@@ -76,7 +76,7 @@
       "name": "sassy_count",
       "kind": "scalar",
       "category": "Search",
-      "signature": "sassy_count(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "signature": "sassy_count(pattern, text, k[, alphabet[, rc[, all_endpoints]]])\n-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false",
       "returns": "UBIGINT",
       "description": "Count the matches `sassy_matches` would return, without building CIGAR strings.",
       "examples": [
@@ -87,7 +87,7 @@
       "name": "sassy_count_many",
       "kind": "scalar",
       "category": "Search",
-      "signature": "sassy_count_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "signature": "sassy_count_many(patterns, text, k[, alphabet[, rc[, all_endpoints]]])\n-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false",
       "returns": "UBIGINT",
       "description": "Count the matches of every pattern in a panel, without building CIGAR strings.",
       "examples": [
@@ -98,7 +98,7 @@
       "name": "sassy_contains",
       "kind": "scalar",
       "category": "Search",
-      "signature": "sassy_contains(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "signature": "sassy_contains(pattern, text, k[, alphabet[, rc[, all_endpoints]]])\n-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false",
       "returns": "BOOLEAN",
       "description": "Return whether the text contains at least one match of the pattern with at most k edits.",
       "examples": [
@@ -109,7 +109,7 @@
       "name": "sassy_contains_many",
       "kind": "scalar",
       "category": "Search",
-      "signature": "sassy_contains_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "signature": "sassy_contains_many(patterns, text, k[, alphabet[, rc[, all_endpoints]]])\n-- Optional arguments are positional; defaults: alphabet = 'iupac', rc = true, all_endpoints = false",
       "returns": "BOOLEAN",
       "description": "Return whether any pattern in the panel matches the text with at most k edits.",
       "examples": [
@@ -132,7 +132,7 @@
       "name": "sassy_crispr_matches",
       "kind": "scalar",
       "category": "CRISPR",
-      "signature": "sassy_crispr_matches(guide, text, k[, pam_length := 3[, allow_pam_edits := false[, max_n_frac := 0.2[, rc := true]]]])",
+      "signature": "sassy_crispr_matches(guide, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])\n-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true",
       "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]",
       "description": "Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default.",
       "examples": [
@@ -143,7 +143,7 @@
       "name": "sassy_crispr_matches_many",
       "kind": "scalar",
       "category": "CRISPR",
-      "signature": "sassy_crispr_matches_many(guides, text, k[, pam_length := 3[, allow_pam_edits := false[, max_n_frac := 0.2[, rc := true]]]])",
+      "signature": "sassy_crispr_matches_many(guides, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])\n-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true",
       "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]",
       "description": "Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls.",
       "examples": [
