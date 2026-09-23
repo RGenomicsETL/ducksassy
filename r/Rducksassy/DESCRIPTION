@@ -17,7 +17,7 @@ Description: Builds and loads the 'ducksassy' DuckDB extension for approximate
     compose with SQL filtering, joins and aggregation. FASTA and FASTQ readers
     are supplied by 'Rduckhts'. Loading the extension requires a DuckDB host
     with C API v2 support.
-License: MIT + file LICENSE
+License: GPL (>= 2)
 Copyright: See inst/LICENCE.note for bundled dependency authors and licenses.
 URL: https://github.com/RGenomicsETL/ducksassy
 BugReports: https://github.com/RGenomicsETL/ducksassy/issues

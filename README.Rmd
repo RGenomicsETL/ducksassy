@@ -393,8 +393,9 @@ make test sql-test oracle-test readme
 `ducksassy-package.json`, installed separately under `.deps/Rlib/`.
 `make benchmarks` re-renders the [benchmark report](benchmarks/sequence_search.md).
 
-## Credits
+## License and credits
 
+ducksassy is licensed under the [GNU GPL, version 2 or later](LICENSE).
 [Sassy](https://github.com/RagnarGrootKoerkamp/sassy) is by Rick Beeloo and
 Ragnar Groot Koerkamp ([MIT](third_party/sassy/LICENSE)). File reading comes
 from [DuckHTS](https://github.com/RGenomicsETL/duckhts).
