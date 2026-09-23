@@ -3,9 +3,7 @@
 #define DUCKDB_V2_API_ALLOW_UNSTABLE 0
 #define DUCKDB_V2_API_ALLOW_DEPRECATED 0
 #include "duckdb_extension_v2.h"
-#include "sassy_c.h"
-#include <ctype.h>
-#include <limits.h>
+#include "ducksassy_core.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -17,80 +15,6 @@
 #endif
 
 DUCKDB_EXTENSION_EXTERN
-
-#define CHUNK_HIT_LIMIT UINT64_C(1048576)
-#define PANEL_LIMIT 4096
-#define ALPHABET_COUNT (SASSY_C_IUPAC + 1)
-#define ORIENTATION_COUNT 2
-
-typedef enum {
-    ARG_PATTERN,
-    ARG_TEXT,
-    ARG_MAX_EDITS,
-    ARG_ALPHABET,
-    ARG_PAM_LENGTH = ARG_ALPHABET,
-    ARG_REVERSE_COMPLEMENT,
-    ARG_ALL_ENDPOINTS,
-    ARG_ALLOW_PAM_EDITS = ARG_ALL_ENDPOINTS,
-    ARG_MAX_N_FRACTION,
-    SEARCH_BASE_ARGUMENT_COUNT = ARG_MAX_N_FRACTION,
-    CRISPR_ARGUMENT_COUNT = ARG_MAX_N_FRACTION + 1,
-    ARG_CIGAR_FORMAT = ARG_MAX_N_FRACTION, /* matches and CRISPR use different final arguments */
-    SEARCH_ARGUMENT_COUNT = ARG_CIGAR_FORMAT + 1
-} search_argument;
-
-typedef enum {
-    HIT_PATTERN_INDEX,
-    HIT_TEXT_START,
-    HIT_TEXT_END,
-    HIT_PATTERN_START,
-    HIT_PATTERN_END,
-    HIT_COST,
-    HIT_STRAND,
-    HIT_CIGAR,
-    HIT_CIGAR_OPS,
-    HIT_FIELD_COUNT
-} hit_field;
-
-typedef enum {
-    OP_MATCHES,
-    OP_COUNT,
-    OP_CONTAINS,
-    OP_CRISPR
-} operation_kind;
-
-typedef struct {
-    const char *name;
-    operation_kind kind;
-    bool panel;
-} search_operation;
-
-static const search_operation operations[] = {
-    {.name = "__sassy_matches", .kind = OP_MATCHES, .panel = false},
-    {.name = "__sassy_matches_many", .kind = OP_MATCHES, .panel = true},
-    {.name = "__sassy_count", .kind = OP_COUNT, .panel = false},
-    {.name = "__sassy_count_many", .kind = OP_COUNT, .panel = true},
-    {.name = "__sassy_contains", .kind = OP_CONTAINS, .panel = false},
-    {.name = "__sassy_contains_many", .kind = OP_CONTAINS, .panel = true},
-    {.name = "__sassy_crispr_matches", .kind = OP_CRISPR, .panel = false},
-    {.name = "__sassy_crispr_matches_many", .kind = OP_CRISPR, .panel = true}};
-
-typedef struct {
-    sassy_c_searcher *searchers[ALPHABET_COUNT][ORIENTATION_COUNT];
-    sassy_c_slice *patterns;
-    size_t pattern_capacity;
-} search_worker;
-
-/* Both buffers are borrowed from one sassy_c_result. */
-typedef struct {
-    const sassy_c_hit *hits;
-    size_t hit_count;
-    const uint8_t *cigars;
-    size_t cigar_bytes;
-    const sassy_c_op_span *spans;
-    const uint32_t *ops;
-    size_t op_count;
-} hit_batch_view;
 
 static duckdb_v2_str string_view(const char *text) {
     duckdb_v2_str view = {text, (idx_t)strlen(text)};
@@ -155,19 +79,6 @@ static sassy_c_slice byte_span(const duckdb_v2_vector_view *view, idx_t row) {
     return span;
 }
 
-static bool equal_label(sassy_c_slice value, const char *label) {
-    size_t length = strlen(label);
-    if (value.len != length) {
-        return false;
-    }
-    for (size_t index = 0; index < length; ++index) {
-        if (tolower((unsigned char)value.data[index]) != (unsigned char)label[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 static int64_t integer_at(const duckdb_v2_vector_view *view, idx_t row) {
     return ((const int64_t *)view->data)[physical_row(view, row)];
 }
@@ -201,20 +112,6 @@ static DUCKDB_V2_ERROR write_bytes(duckdb_v2_arena_handle arena, duckdb_v2_bytes
     return DUCKDB_V2_ERROR_NONE;
 }
 
-static void worker_destroy(void *pointer) {
-    search_worker *worker = (search_worker *)pointer;
-    if (!worker) {
-        return;
-    }
-    for (uint32_t alphabet = 0; alphabet < ALPHABET_COUNT; ++alphabet) {
-        for (uint32_t orientation = 0; orientation < ORIENTATION_COUNT; ++orientation) {
-            sassy_c_searcher_free(worker->searchers[alphabet][orientation]);
-        }
-    }
-    free(worker->patterns);
-    free(worker);
-}
-
 static void scalar_init(duckdb_v2_scalar_function_init_info_handle info,
                         duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
     (void)context;
@@ -241,10 +138,10 @@ typedef struct {
     uint64_t *struct_validity;
     duckdb_v2_arena_handle cigar_arena;
     idx_t capacity;
-    idx_t op_used;
-    bool packed;
-    bool text;
     bool extended;
+    duckdb_v2_vector_handle ops;
+    uint32_t *op_data;
+    idx_t op_size, op_capacity;
 } hit_output;
 
 static bool resize_hit_output(hit_output *output, idx_t size,
@@ -277,10 +174,7 @@ static bool append_hits(hit_output *output, const hit_batch_view *batch, idx_t o
                         duckdb_v2_error_info_handle *error) {
     duckdb_v2_error_info_handle detail = NULL;
     bool success = false;
-    if ((uint64_t)batch->hit_count > CHUNK_HIT_LIMIT - offset) {
-        INPUT_ERROR("ducksassy: chunk exceeds 1048576 output hits; reduce the search scope or use "
-                    "count/contains");
-    }
+    if (!batch->hit_count) return true;
     idx_t required = offset + batch->hit_count;
     if (required > output->capacity) {
         idx_t capacity = output->capacity ? output->capacity : 2048;
@@ -290,6 +184,26 @@ static bool append_hits(hit_output *output, const hit_batch_view *batch, idx_t o
         if (!resize_hit_output(output, capacity, error)) {
             goto cleanup;
         }
+    }
+    if (batch->packed) {
+        if (batch->op_count > UINT64_MAX - output->op_size) INPUT_ERROR("ducksassy: packed CIGAR size overflow");
+        idx_t needed = output->op_size + batch->op_count;
+        if (needed > output->op_capacity) {
+            idx_t capacity = output->op_capacity ? output->op_capacity : 2048;
+            while (capacity < needed) {
+                if (capacity > UINT64_MAX / 2) { capacity = needed; break; }
+                capacity *= 2;
+            }
+            DUCKDB_CALL(duckdb_v2_vector_get_child(output->fields[HIT_CIGAR_OPS], 0, &output->ops, &detail));
+            DUCKDB_CALL(duckdb_v2_vector_set_size(output->ops, capacity, &detail));
+            DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(output->ops, (void **)&output->op_data, &detail));
+            uint64_t *validity = NULL;
+            DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(output->ops, &validity, &detail));
+            memset(validity, 0xFF, ((capacity + 63) / 64) * sizeof(*validity));
+            output->op_capacity = capacity;
+        }
+        if (batch->op_count) memcpy(output->op_data + output->op_size, batch->ops,
+                                    batch->op_count * sizeof(*batch->ops));
     }
     void **field_data = output->data;
     for (size_t index = 0; index < batch->hit_count; ++index) {
@@ -304,64 +218,106 @@ static bool append_hits(hit_output *output, const hit_batch_view *batch, idx_t o
         const uint8_t strand = hit->strand ? '-' : '+';
         duckdb_v2_bytes *strand_output = &((duckdb_v2_bytes *)field_data[HIT_STRAND])[position];
         DUCKDB_CALL(write_bytes(NULL, strand_output, &strand, 1, &detail));
-        if (hit->cigar_offset > batch->cigar_bytes ||
-            hit->cigar_length > batch->cigar_bytes - hit->cigar_offset) {
-            INPUT_ERROR("ducksassy: invalid CIGAR slab bounds returned by Rust");
-        }
-        const uint8_t *cigar = hit->cigar_length ? batch->cigars + hit->cigar_offset : NULL;
-        duckdb_v2_bytes *cigar_output = &((duckdb_v2_bytes *)field_data[HIT_CIGAR])[position];
-        if (output->text) {
-            DUCKDB_CALL(write_bytes(output->cigar_arena, cigar_output, cigar,
-                                    (size_t)hit->cigar_length, &detail));
-        } else {
-            DUCKDB_CALL(duckdb_v2_vector_set_null(output->fields[HIT_CIGAR], position, &detail));
-        }
-        if (output->packed) {
-            if (!batch->spans ||
-                batch->spans[index].offset > batch->op_count ||
-                batch->spans[index].length > batch->op_count - batch->spans[index].offset ||
-                batch->spans[index].length > SIZE_MAX / sizeof(uint32_t) - output->op_used) {
-                INPUT_ERROR("ducksassy: invalid packed CIGAR slab bounds");
-            }
-            idx_t length = (idx_t)batch->spans[index].length;
-            duckdb_v2_vector_handle child = NULL;
-            void *child_data = NULL;
-            DUCKDB_CALL(duckdb_v2_vector_get_child(output->fields[HIT_CIGAR_OPS], 0, &child, &detail));
-            DUCKDB_CALL(duckdb_v2_vector_set_size(child, output->op_used + length, &detail));
-            DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(child, &child_data, &detail));
-            if (length) {
-                memcpy((uint32_t *)child_data + output->op_used,
-                       batch->ops + batch->spans[index].offset, length * sizeof(uint32_t));
-            }
-            ((duckdb_v2_list_entry *)field_data[HIT_CIGAR_OPS])[position] =
-                (duckdb_v2_list_entry){output->op_used, length};
-            output->op_used += length;
-        } else if (output->extended) {
-            DUCKDB_CALL(duckdb_v2_vector_set_null(output->fields[HIT_CIGAR_OPS], position, &detail));
+        if (batch->text) {
+            const uint8_t *cigar = hit->cigar_length ? batch->cigars + hit->cigar_offset : NULL;
+            duckdb_v2_bytes *cigar_output = &((duckdb_v2_bytes *)field_data[HIT_CIGAR])[position];
+            DUCKDB_CALL(write_bytes(output->cigar_arena, cigar_output, cigar, (size_t)hit->cigar_length, &detail));
         }
         mark_valid(output->struct_validity, position);
         for (idx_t field = 0; field < (output->extended ? HIT_FIELD_COUNT : HIT_CIGAR_OPS); ++field) {
-            if ((field != HIT_CIGAR || output->text) &&
-                (field != HIT_CIGAR_OPS || output->packed)) mark_valid(output->validity[field], position);
+            mark_valid(output->validity[field], position);
+        }
+        if (!batch->text) output->validity[HIT_CIGAR][position >> 6] &= ~(UINT64_C(1) << (position & 63));
+        if (output->extended) {
+            sassy_c_op_span span = batch->packed ? batch->spans[index] : (sassy_c_op_span){0, 0};
+            ((duckdb_v2_list_entry *)field_data[HIT_CIGAR_OPS])[position] =
+                (duckdb_v2_list_entry){output->op_size + span.offset, span.length};
+            if (!batch->packed) output->validity[HIT_CIGAR_OPS][position >> 6] &= ~(UINT64_C(1) << (position & 63));
         }
     }
+    output->op_size += batch->op_count;
     success = true;
 cleanup:
     (void)duckdb_v2_error_info_destroy(&detail);
     return success;
 }
 
+typedef struct {
+    duckdb_v2_vector_view *views;
+    search_worker *worker;
+    const search_operation *operation;
+    duckdb_v2_vector_handle output;
+    void *data;
+    uint64_t *validity;
+    hit_output *hits;
+    duckdb_v2_error_info_handle *error;
+} scalar_context;
+
+static bool input_valid(void *pointer, unsigned argument, uint64_t row) {
+    return row_is_valid(&((scalar_context *)pointer)->views[argument], row);
+}
+static sassy_c_slice input_string(void *pointer, unsigned argument, uint64_t row) {
+    return byte_span(&((scalar_context *)pointer)->views[argument], row);
+}
+static int64_t input_integer(void *pointer, unsigned argument, uint64_t row) {
+    return integer_at(&((scalar_context *)pointer)->views[argument], row);
+}
+static bool input_boolean(void *pointer, unsigned argument, uint64_t row) {
+    return boolean_at(&((scalar_context *)pointer)->views[argument], row);
+}
+static double input_real(void *pointer, unsigned argument, uint64_t row) {
+    const duckdb_v2_vector_view *view = &((scalar_context *)pointer)->views[argument];
+    return ((const double *)view->data)[physical_row(view, row)];
+}
+static panel_entry input_list(void *pointer, uint64_t row) {
+    scalar_context *context = pointer;
+    const duckdb_v2_vector_view *view = &context->views[ARG_PATTERN];
+    duckdb_v2_list_entry entry = ((const duckdb_v2_list_entry *)view->data)[physical_row(view, row)];
+    return (panel_entry){entry.offset, entry.length, context->views[ARG_PANEL_CHILD].count};
+}
+static bool output_hits(void *pointer, const hit_batch_view *batch, uint64_t offset) {
+    scalar_context *context = pointer;
+    return append_hits(context->hits, batch, offset, context->error);
+}
+static bool output_result(void *pointer, uint64_t row, bool valid, uint64_t offset, uint64_t count) {
+    scalar_context *context = pointer;
+    duckdb_v2_error_info_handle detail = NULL;
+    duckdb_v2_error_info_handle *error = context->error;
+    if (context->operation->kind == OP_MATCHES || context->operation->kind == OP_CRISPR) {
+        ((duckdb_v2_list_entry *)context->data)[row] = (duckdb_v2_list_entry){offset, count};
+    } else if (valid && context->operation->kind == OP_COUNT) {
+        ((uint64_t *)context->data)[row] = count;
+    } else if (valid) {
+        ((bool *)context->data)[row] = count != 0;
+    }
+    if (valid) mark_valid(context->validity, row);
+    else DUCKDB_CALL(duckdb_v2_vector_set_null(context->output, row, &detail));
+    (void)duckdb_v2_error_info_destroy(&detail);
+    return true;
+cleanup:
+    (void)duckdb_v2_error_info_destroy(&detail);
+    return false;
+}
+static search_worker *input_worker(void *pointer) {
+    return ((scalar_context *)pointer)->worker;
+}
+static void input_error(void *pointer, const char *message) {
+    set_error(*((scalar_context *)pointer)->error, DUCKDB_V2_ERROR_INPUT_INVALID, message);
+}
+static const search_host host = {
+    input_valid, input_string, input_integer, input_boolean, input_real, input_list,
+    output_hits, output_result, input_worker, input_error
+};
+
 static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
                         duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
     (void)context;
     duckdb_v2_error_info_handle detail = NULL;
-    duckdb_v2_vector_handle arguments[SEARCH_ARGUMENT_COUNT] = {0};
+    duckdb_v2_vector_handle arguments[CRISPR_ARGUMENT_COUNT] = {0};
     duckdb_v2_vector_handle output = NULL;
     duckdb_v2_vector_handle pattern_child = NULL;
     duckdb_v2_vector_handle hit_struct = NULL;
-    duckdb_v2_vector_view views[SEARCH_ARGUMENT_COUNT];
-    duckdb_v2_vector_view pattern_view;
-    sassy_c_result *result = NULL;
+    duckdb_v2_vector_view views[CRISPR_ARGUMENT_COUNT + 1];
     search_worker *worker = NULL;
     void *user_data = NULL;
     void *init_data = NULL;
@@ -378,12 +334,11 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
     if (!operation || !worker) {
         INPUT_ERROR("ducksassy: missing function/worker state");
     }
-    hits.extended = operation->kind == OP_MATCHES;
-
     bool crispr = operation->kind == OP_CRISPR;
     bool output_hits = operation->kind == OP_MATCHES || crispr;
-    uint32_t argument_count = operation->kind == OP_MATCHES ? SEARCH_ARGUMENT_COUNT :
-        (crispr ? CRISPR_ARGUMENT_COUNT : SEARCH_BASE_ARGUMENT_COUNT);
+    hits.extended = operation->kind == OP_MATCHES;
+    uint32_t argument_count = crispr ? CRISPR_ARGUMENT_COUNT :
+        hits.extended ? SEARCH_ARGUMENT_COUNT : SEARCH_BASE_ARGUMENT_COUNT;
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &row_count, &detail));
 
     /* Flatten all inputs before borrowing views: a later aliased dictionary
@@ -401,7 +356,7 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         DUCKDB_CALL(duckdb_v2_vector_get_view(arguments[argument], &views[argument], &detail));
     }
     if (operation->panel) {
-        DUCKDB_CALL(duckdb_v2_vector_get_view(pattern_child, &pattern_view, &detail));
+        DUCKDB_CALL(duckdb_v2_vector_get_view(pattern_child, &views[ARG_PANEL_CHILD], &detail));
     }
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_result(info, &output, &detail));
     DUCKDB_CALL(duckdb_v2_vector_flatten(output, &detail));
@@ -414,164 +369,16 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         hits.vector = hit_struct;
     }
 
-    for (idx_t row = 0; row < row_count; ++row) {
-        bool valid = true;
-        for (uint32_t argument = 0; argument < argument_count; ++argument) {
-            valid = valid && row_is_valid(&views[argument], row);
-        }
-        if (!valid) {
-            if (output_hits) {
-                ((duckdb_v2_list_entry *)output_data)[row] = (duckdb_v2_list_entry){0, 0};
-            }
-            DUCKDB_CALL(duckdb_v2_vector_set_null(output, row, &detail));
-            continue;
-        }
-
-        int64_t max_edits = integer_at(&views[ARG_MAX_EDITS], row);
-        if (max_edits < 0 || (uint64_t)max_edits > UINT32_MAX) {
-            INPUT_ERROR("ducksassy: k must be nonnegative");
-        }
-        uint32_t alphabet = SASSY_C_IUPAC;
-        sassy_c_crispr_options crispr_options = {0};
-        if (crispr) {
-            int64_t pam_length = integer_at(&views[ARG_PAM_LENGTH], row);
-            const duckdb_v2_vector_view *fraction_view = &views[ARG_MAX_N_FRACTION];
-            double max_n_fraction =
-                ((const double *)fraction_view->data)[physical_row(fraction_view, row)];
-            if (pam_length <= 0 || (uint64_t)pam_length > UINT32_MAX ||
-                !(max_n_fraction >= 0.0 && max_n_fraction <= 1.0)) {
-                INPUT_ERROR(
-                    "ducksassy: pam_length must be positive and max_n_frac must be in [0,1]");
-            }
-            crispr_options.struct_size = sizeof(crispr_options);
-            crispr_options.pam_length = (uint32_t)pam_length;
-            crispr_options.allow_pam_edits = boolean_at(&views[ARG_ALLOW_PAM_EDITS], row) ? 1U : 0U;
-            crispr_options.include_cigar = 1;
-            crispr_options.max_n_frac = (float)max_n_fraction;
-        } else {
-            sassy_c_slice label = byte_span(&views[ARG_ALPHABET], row);
-            if (equal_label(label, "ascii")) {
-                alphabet = SASSY_C_ASCII;
-            } else if (equal_label(label, "dna")) {
-                alphabet = SASSY_C_DNA;
-            } else if (equal_label(label, "iupac")) {
-                alphabet = SASSY_C_IUPAC;
-            } else {
-                INPUT_ERROR("ducksassy: alphabet must be ascii, dna, or iupac");
-            }
-        }
-        uint32_t reverse_complement = boolean_at(&views[ARG_REVERSE_COMPLEMENT], row) ? 1U : 0U;
-        sassy_c_searcher **searcher = &worker->searchers[alphabet][reverse_complement];
-        if (!*searcher &&
-            sassy_c_searcher_new(alphabet, reverse_complement, searcher) != SASSY_C_OK) {
-            INPUT_ERROR(sassy_c_last_error());
-        }
-        if (operation->kind == OP_MATCHES) {
-            sassy_c_slice format = byte_span(&views[ARG_CIGAR_FORMAT], row);
-            if (equal_label(format, "text")) {
-                hits.text = true;
-                hits.packed = false;
-            } else if (equal_label(format, "packed")) {
-                hits.text = false;
-                hits.packed = true;
-            } else if (equal_label(format, "both")) {
-                hits.text = true;
-                hits.packed = true;
-            } else {
-                INPUT_ERROR("ducksassy: cigar_format must be text, packed, or both");
-            }
-        } else {
-            hits.text = true;
-            hits.packed = false;
-        }
-        sassy_c_options options = {.struct_size = sizeof(options),
-                                   .all_endpoints =
-                                       boolean_at(&views[ARG_ALL_ENDPOINTS], row) ? 1U : 0U,
-                                   .include_cigar = output_hits && hits.text ? 1U : 0U,
-                                   .reserved = hits.packed ? SASSY_C_PACKED_CIGAR : 0U};
-
-        sassy_c_slice text = byte_span(&views[ARG_TEXT], row);
-        sassy_c_slice single_pattern;
-        const sassy_c_slice *patterns = &single_pattern;
-        size_t pattern_count = 1;
-        if (operation->panel) {
-            const duckdb_v2_vector_view *panel_view = &views[ARG_PATTERN];
-            duckdb_v2_list_entry entry =
-                ((const duckdb_v2_list_entry *)panel_view->data)[physical_row(panel_view, row)];
-            if (entry.length > PANEL_LIMIT || entry.offset > pattern_view.count ||
-                entry.length > pattern_view.count - entry.offset) {
-                INPUT_ERROR("ducksassy: invalid panel bounds or more than 4096 patterns");
-            }
-            pattern_count = (size_t)entry.length;
-            if (pattern_count > worker->pattern_capacity) {
-                sassy_c_slice *resized =
-                    (sassy_c_slice *)realloc(worker->patterns, pattern_count * sizeof(*resized));
-                if (!resized) {
-                    INPUT_ERROR("ducksassy: pattern descriptor allocation failed");
-                }
-                worker->patterns = resized;
-                worker->pattern_capacity = pattern_count;
-            }
-            for (size_t index = 0; index < pattern_count; ++index) {
-                idx_t child_row = entry.offset + index;
-                if (!row_is_valid(&pattern_view, child_row)) {
-                    INPUT_ERROR("ducksassy: a pattern panel cannot contain NULL elements");
-                }
-                worker->patterns[index] = byte_span(&pattern_view, child_row);
-            }
-            patterns = worker->patterns;
-        } else {
-            single_pattern = byte_span(&views[ARG_PATTERN], row);
-        }
-
-        int32_t status;
-        if (crispr) {
-            status = sassy_c_crispr_search_many(*searcher, patterns, pattern_count, text,
-                                                (uint32_t)max_edits, &crispr_options, &result);
-        } else {
-            status = sassy_c_search_many(*searcher, patterns, pattern_count, text,
-                                         (uint32_t)max_edits, &options, &result);
-        }
-        if (operation->panel && pattern_count > 0) {
-            memset(worker->patterns, 0, pattern_count * sizeof(*worker->patterns));
-        }
-        if (status != SASSY_C_OK) {
-            INPUT_ERROR(sassy_c_last_error());
-        }
-        hit_batch_view batch = {0};
-        if (sassy_c_result_view(result, &batch.hits, &batch.hit_count, &batch.cigars,
-                                &batch.cigar_bytes) != SASSY_C_OK) {
-            INPUT_ERROR(sassy_c_last_error());
-        }
-        if (hits.packed && sassy_c_result_ops_view(result, &batch.spans, &batch.ops,
-                                                   &batch.op_count) != SASSY_C_OK) {
-            INPUT_ERROR(sassy_c_last_error());
-        }
-        if (operation->kind == OP_COUNT) {
-            ((uint64_t *)output_data)[row] = (uint64_t)batch.hit_count;
-        } else if (operation->kind == OP_CONTAINS) {
-            ((bool *)output_data)[row] = batch.hit_count != 0;
-        } else {
-            if (!append_hits(&hits, &batch, total_hits, error)) {
-                goto cleanup;
-            }
-            ((duckdb_v2_list_entry *)output_data)[row] =
-                (duckdb_v2_list_entry){total_hits, (idx_t)batch.hit_count};
-            total_hits += batch.hit_count;
-        }
-        mark_valid(output_validity, row);
-        sassy_c_result_recycle(*searcher, result);
-        result = NULL;
-    }
-    // Capacity is private to this callback; expose only the initialized hits.
-    if (output_hits && !resize_hit_output(&hits, total_hits, error)) {
-        goto cleanup;
+    scalar_context execution = {views, worker, operation, output, output_data,
+                                output_validity, &hits, error};
+    if (!search_execute(operation, &host, &execution, row_count, &total_hits)) goto cleanup;
+    /* Capacity is private to this callback; expose only initialized hits. */
+    if (output_hits && !resize_hit_output(&hits, total_hits, error)) goto cleanup;
+    if (hits.extended) {
+        DUCKDB_CALL(duckdb_v2_vector_get_child(hits.fields[HIT_CIGAR_OPS], 0, &hits.ops, &detail));
+        DUCKDB_CALL(duckdb_v2_vector_set_size(hits.ops, hits.op_size, &detail));
     }
 cleanup:
-    sassy_c_result_free(result);
-    if (worker && worker->patterns) {
-        memset(worker->patterns, 0, worker->pattern_capacity * sizeof(*worker->patterns));
-    }
     (void)duckdb_v2_error_info_destroy(&detail);
 }
 
@@ -590,25 +397,28 @@ static bool register_operation(duckdb_v2_extension_handle extension,
     char pattern_type[32];
     (void)snprintf(pattern_type, sizeof(pattern_type), "%s%s", sequence_type,
                    operation->panel ? "[]" : "");
-    const char *types[SEARCH_ARGUMENT_COUNT] = {[ARG_PATTERN] = pattern_type,
+    const char *types[CRISPR_ARGUMENT_COUNT] = {[ARG_PATTERN] = pattern_type,
                                                 [ARG_TEXT] = sequence_type,
                                                 [ARG_MAX_EDITS] = "BIGINT",
                                                 [ARG_ALPHABET] = "VARCHAR",
                                                 [ARG_REVERSE_COMPLEMENT] = "BOOLEAN",
                                                 [ARG_ALL_ENDPOINTS] = "BOOLEAN",
-                                                [ARG_CIGAR_FORMAT] = "VARCHAR"};
-    const char *names[SEARCH_ARGUMENT_COUNT] = {[ARG_PATTERN] = "pattern",
+                                                [ARG_MAX_N_FRACTION] = "DOUBLE"};
+    const char *names[CRISPR_ARGUMENT_COUNT] = {[ARG_PATTERN] = "pattern",
                                                 [ARG_TEXT] = "text",
                                                 [ARG_MAX_EDITS] = "k",
                                                 [ARG_ALPHABET] = "alphabet",
                                                 [ARG_REVERSE_COMPLEMENT] = "rc",
                                                 [ARG_ALL_ENDPOINTS] = "all_endpoints",
-                                                [ARG_CIGAR_FORMAT] = "cigar_format"};
-    uint32_t argument_count = operation->kind == OP_MATCHES ? SEARCH_ARGUMENT_COUNT :
-        (operation->kind == OP_CRISPR ? CRISPR_ARGUMENT_COUNT : SEARCH_BASE_ARGUMENT_COUNT);
+                                                [ARG_MAX_N_FRACTION] = "max_n_frac"};
+    uint32_t argument_count = SEARCH_BASE_ARGUMENT_COUNT;
+    if (operation->kind == OP_MATCHES) {
+        argument_count = SEARCH_ARGUMENT_COUNT;
+        types[ARG_CIGAR_FORMAT] = "VARCHAR";
+        names[ARG_CIGAR_FORMAT] = "cigar_format";
+    }
     if (operation->kind == OP_CRISPR) {
-        types[ARG_MAX_N_FRACTION] = "DOUBLE";
-        names[ARG_MAX_N_FRACTION] = "max_n_frac";
+        argument_count = CRISPR_ARGUMENT_COUNT;
         types[ARG_PAM_LENGTH] = "BIGINT";
         names[ARG_PATTERN] = "guide";
         names[ARG_PAM_LENGTH] = "pam_length";
@@ -628,8 +438,7 @@ static bool register_operation(duckdb_v2_extension_handle extension,
         return_type = "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, "
                       "pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand "
                       "VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]";
-    }
-    if (operation->kind == OP_COUNT) {
+    } else if (operation->kind == OP_COUNT) {
         return_type = "UBIGINT";
     } else if (operation->kind == OP_CONTAINS) {
         return_type = "BOOLEAN";
@@ -761,39 +570,11 @@ cleanup:
     return success;
 }
 
-/* One text value, searched in bounded pieces. DuckDB stops calling exec once
- * an outer LIMIT is satisfied. Endpoints belong to exactly one 1024-byte core;
- * the left overlap contains every possible alignment ending in that core. */
-#define GREP_CORE_BYTES 1024U
-#define GREP_OUTPUT_ROWS 1024U
-
-typedef enum {
-    GREP_TEXT_START,
-    GREP_TEXT_END,
-    GREP_COST,
-    GREP_CIGAR,
-    GREP_COLUMN_COUNT
-} grep_column;
-
 typedef struct {
     duckdb_v2_value_handle pattern_value;
     duckdb_v2_value_handle text_value;
-    sassy_c_slice pattern;
-    sassy_c_slice text;
-    uint32_t k;
+    grep_input input;
 } grep_bind_data;
-
-typedef struct {
-    sassy_c_searcher *searcher;
-    sassy_c_result *result;
-    const sassy_c_hit *hits;
-    const uint8_t *cigars;
-    size_t hit_count;
-    size_t hit_index;
-    size_t core_begin;
-    size_t core_start;
-    size_t window_start;
-} grep_state;
 
 static void grep_bind_destroy(void *pointer) {
     grep_bind_data *data = (grep_bind_data *)pointer;
@@ -801,15 +582,6 @@ static void grep_bind_destroy(void *pointer) {
         (void)duckdb_v2_value_destroy(&data->pattern_value);
         (void)duckdb_v2_value_destroy(&data->text_value);
         free(data);
-    }
-}
-
-static void grep_state_destroy(void *pointer) {
-    grep_state *state = (grep_state *)pointer;
-    if (state) {
-        sassy_c_result_free(state->result);
-        sassy_c_searcher_free(state->searcher);
-        free(state);
     }
 }
 
@@ -840,22 +612,18 @@ static void grep_bind(duckdb_v2_table_function_bind_info_handle info,
     DUCKDB_CALL(duckdb_v2_value_get_varchar(pattern_value, &pattern, &detail));
     DUCKDB_CALL(duckdb_v2_value_get_varchar(text_value, &text, &detail));
     DUCKDB_CALL(duckdb_v2_value_get_bigint(k_value, &k, &detail));
-    if (pattern.len == 0 || pattern.len > 4096 || k < 0 ||
-        (uint64_t)k >= pattern.len || k > UINT32_MAX) {
+    if (k < 0 || k > UINT32_MAX) {
         INPUT_ERROR("sassy_grep: pattern must contain 1..4096 bytes and 0 <= k < pattern length");
     }
-    for (idx_t byte = 0; byte < pattern.len; ++byte) {
-        if ((unsigned char)pattern.ptr[byte] >= 128) {
-            INPUT_ERROR("sassy_grep: pattern must be ASCII");
-        }
-    }
+    grep_input input = {{(const uint8_t *)pattern.ptr, (size_t)pattern.len},
+                        {(const uint8_t *)text.ptr, (size_t)text.len}, (uint32_t)k};
+    const char *message = NULL;
+    if (!grep_validate(&input, &message)) INPUT_ERROR(message);
     data = (grep_bind_data *)calloc(1, sizeof(*data));
     if (!data) {
         INPUT_ERROR("sassy_grep: allocation failed");
     }
-    data->pattern = (sassy_c_slice){(const uint8_t *)pattern.ptr, (size_t)pattern.len};
-    data->text = (sassy_c_slice){(const uint8_t *)text.ptr, (size_t)text.len};
-    data->k = (uint32_t)k;
+    data->input = input;
     data->pattern_value = pattern_value;
     data->text_value = text_value;
     pattern_value = NULL;
@@ -905,50 +673,6 @@ cleanup:
     (void)duckdb_v2_error_info_destroy(&detail);
 }
 
-/* Returns 1 for a loaded window, 0 at end of input, -1 on search failure. */
-static int grep_load_window(const grep_bind_data *data, grep_state *state,
-                            duckdb_v2_error_info_handle *error) {
-    if (state->core_start >= data->text.len) {
-        return 0;
-    }
-
-    const size_t overlap = data->pattern.len + data->k;
-    state->core_begin = state->core_start;
-    state->window_start = state->core_begin > overlap ? state->core_begin - overlap : 0;
-
-    const size_t remaining = data->text.len - state->core_begin;
-    const size_t core_length = remaining < GREP_CORE_BYTES ? remaining : GREP_CORE_BYTES;
-    const size_t core_end = state->core_begin + core_length;
-    const size_t right_remaining = data->text.len - core_end;
-    const size_t right_overlap = right_remaining < overlap ? right_remaining : overlap;
-    const size_t window_end = core_end + right_overlap;
-    sassy_c_slice window = {
-        data->text.data + state->window_start,
-        window_end - state->window_start
-    };
-    sassy_c_options options = {
-        .struct_size = sizeof(options),
-        .all_endpoints = 1,
-        .include_cigar = 1
-    };
-
-    if (sassy_c_search(state->searcher, data->pattern, window, data->k, &options,
-                       &state->result) != SASSY_C_OK) {
-        set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, sassy_c_last_error());
-        return -1;
-    }
-
-    size_t cigar_bytes = 0;
-    if (sassy_c_result_view(state->result, &state->hits, &state->hit_count,
-                            &state->cigars, &cigar_bytes) != SASSY_C_OK) {
-        set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, sassy_c_last_error());
-        return -1;
-    }
-    state->hit_index = 0;
-    state->core_start = core_end;
-    return 1;
-}
-
 static void grep_exec(duckdb_v2_table_function_exec_info_handle info,
                       duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
     (void)context;
@@ -972,38 +696,19 @@ static void grep_exec(duckdb_v2_table_function_exec_info_handle info,
     }
     DUCKDB_CALL(duckdb_v2_vector_get_arena(columns[GREP_CIGAR], &arena, &detail));
     while (count < GREP_OUTPUT_ROWS) {
-        if (state->result && state->hit_index == state->hit_count) {
-            sassy_c_result_recycle(state->searcher, state->result);
-            state->result = NULL;
-            state->hits = NULL;
-            state->cigars = NULL;
-        }
-        if (!state->result) {
-            int loaded = grep_load_window(data, state, error);
-            if (loaded < 0) {
-                goto cleanup;
-            }
-            if (loaded == 0) {
-                break;
-            }
-        }
-        while (state->hit_index < state->hit_count && count < GREP_OUTPUT_ROWS) {
-            const sassy_c_hit *hit = &state->hits[state->hit_index++];
-            uint64_t end = hit->text_end + state->window_start;
-            if (end <= state->core_begin || end > state->core_start) {
-                continue;
-            }
-            ((uint64_t *)output[GREP_TEXT_START])[count] = hit->text_start + state->window_start;
-            ((uint64_t *)output[GREP_TEXT_END])[count] = end;
-            ((int32_t *)output[GREP_COST])[count] = hit->cost;
-            DUCKDB_CALL(write_bytes(arena, &((duckdb_v2_bytes *)output[GREP_CIGAR])[count],
-                                    state->cigars + hit->cigar_offset,
-                                    (size_t)hit->cigar_length, &detail));
-            count++;
-        }
-        if (count > 0) {
-            break;
-        }
+        sassy_c_hit hit;
+        const uint8_t *cigar = NULL;
+        const char *message = NULL;
+        int next = grep_next(&data->input, state, &hit, &cigar, &message);
+        if (next < 0) INPUT_ERROR(message);
+        if (next == 0 || (next == 2 && count > 0)) break;
+        if (next == 2) continue;
+        ((uint64_t *)output[GREP_TEXT_START])[count] = hit.text_start;
+        ((uint64_t *)output[GREP_TEXT_END])[count] = hit.text_end;
+        ((int32_t *)output[GREP_COST])[count] = hit.cost;
+        DUCKDB_CALL(write_bytes(arena, &((duckdb_v2_bytes *)output[GREP_CIGAR])[count],
+                                cigar, (size_t)hit.cigar_length, &detail));
+        count++;
     }
     DUCKDB_CALL(duckdb_v2_vector_set_size(columns[GREP_TEXT_START], count, &detail));
 cleanup:

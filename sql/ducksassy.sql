@@ -1,5 +1,4 @@
--- Public binding bootstrap. Install both extensions explicitly beforehand.
--- No network installation, filesystem parser, or re-entrant query in the C callback.
+-- Explicit bootstrap for v2. File macros use a locally installed DuckHTS.
 LOAD duckhts;
 LOAD ducksassy;
 
@@ -35,19 +34,13 @@ CREATE OR REPLACE TEMP MACRO sassy_contains_many(patterns, text, k,
 
 CREATE OR REPLACE TEMP MACRO sassy_crispr_matches(guide, text, k, pam_length := 3,
     allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS
-    CASE WHEN duckhts_htslib_version() IS NOT NULL
-    THEN __sassy_crispr_matches(guide, text, k::BIGINT, pam_length::BIGINT,
-                               rc::BOOLEAN, allow_pam_edits::BOOLEAN,
-                               max_n_frac::DOUBLE)
-    ELSE error('ducksassy requires DuckHTS') END;
+    __sassy_crispr_matches(guide, text, k::BIGINT, pam_length::BIGINT,
+                           rc::BOOLEAN, allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE);
 
 CREATE OR REPLACE TEMP MACRO sassy_crispr_matches_many(guides, text, k, pam_length := 3,
     allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS
-    CASE WHEN duckhts_htslib_version() IS NOT NULL
-    THEN __sassy_crispr_matches_many(guides, text, k::BIGINT, pam_length::BIGINT,
-                                    rc::BOOLEAN, allow_pam_edits::BOOLEAN,
-                                    max_n_frac::DOUBLE)
-    ELSE error('ducksassy requires DuckHTS') END;
+    __sassy_crispr_matches_many(guides, text, k::BIGINT, pam_length::BIGINT,
+                                rc::BOOLEAN, allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE);
 
 CREATE OR REPLACE TEMP MACRO sassy_search_fasta(path, pattern, k, alphabet := 'dna', rc := true,
     all_endpoints := false, cigar_format := 'text') AS TABLE

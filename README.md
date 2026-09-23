@@ -71,7 +71,47 @@ whole-human-genome throughput or peak memory use.
 
 ## Quick start
 
-ducksassy targets the DuckDB C API v2 preview (DuckDB 1.x cannot load it).
+### Released DuckDB v1 host
+
+DuckDB v1.5.5 can load the stable v1.2.0 C API artifact without DuckHTS or
+an external SQL bootstrap:
+
+``` sh
+make sdk-v1 release-v1
+.deps-v1/cli/duckdb -unsigned -no-init
+```
+
+``` sql
+LOAD 'build-v1/ducksassy.duckdb_extension';
+SELECT sassy_count('ACGT', 'TTACGT', 0, 'dna', false);
+SELECT * FROM sassy_grep('error', 'error: disk full', 0);
+SELECT * FROM sassy_backend_info();
+```
+
+Download the CLI separately as described in
+[host architecture, setup and measurements](docs/v1-host.md).
+V1 `LOAD` writes no catalog entries and works on a read-only database.
+Scalars use positional trailing options: `alphabet, rc, all_endpoints, cigar_format` for matches, and `pam_length, allow_pam_edits, max_n_frac, rc`
+for CRISPR. Defaults and VARCHAR/BLOB support match v2. V1 has no file or
+relation-name helpers; compose native calls with a table, CTE or explicitly
+loaded DuckHTS reader:
+
+``` sql
+LOAD '/absolute/path/duckhts.duckdb_extension';
+SELECT r.*, hit
+FROM read_fasta('reference.fa', scan_mode := 'sequential') r
+CROSS JOIN LATERAL unnest(
+    sassy_matches('ACGTAGG', r.sequence, 1, 'iupac', false, false, 'both')
+) AS matches(hit);
+```
+
+Use `read_fastq(...)` for reads, `_many` with a pattern list for panels, or
+`sassy_crispr_matches(guide, r.sequence, k)` for CRISPR. The v1 build uses
+`DUCKSASSY_HOST=v1`; the default is `v2`. Keep their build directories separate.
+
+### Pinned C API v2 host
+
+The v2 artifact targets the DuckDB C API v2 preview.
 `make setup` fetches the matching CLI and checks the bundled SDK. On Linux x86-64 you need C/C++
 compilers, CMake ≥ 3.20, Python ≥ 3.11, Git, R ≥ 4.1 and rustup.
 
@@ -91,7 +131,10 @@ INSTALL 'build/ducksassy.duckdb_extension';
 ```
 
 The lambda setting is required by DuckHTS 1.5.2 and applies to the whole
-database instance, so use a dedicated one. The macros are connection-scoped.
+database instance, so use a dedicated one. V2 keeps its connection-scoped
+macros, `:=` scalar options and file/relation helpers. Positional trailing
+options are v1-only: a same-named macro shadows a native function in v2
+([binding probe](test/v2_macro_collision.sql)).
 Supported host versions are pinned in
 [ducksassy-package.json](ducksassy-package.json). When upgrading, move an
 outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
