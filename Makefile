@@ -1,5 +1,7 @@
 .PHONY: all setup setup-data sdk sdk-v1 vendor-rust r-package r-readme configure release release-v1 test sql-test sql-test-v1 oracle-test r-test readme benchmarks clean
+.PHONY: windows-host-check
 BUILD_DIR ?= build
+MINGW_CC ?= x86_64-w64-mingw32-gcc
 DUCKDB_CAPI_DIR ?= $(CURDIR)/duckdb_capi
 JOBS ?= 2
 V1_BUILD_DIR ?= build-v1
@@ -17,6 +19,10 @@ sdk:
 	python3 tools/fetch_sdk.py $(DUCKDB_CAPI_DIR)
 sdk-v1:
 	python3 tools/fetch_v1_sdk.py
+windows-host-check:
+	mkdir -p $(V1_BUILD_DIR)/windows-host-check
+	$(MINGW_CC) -std=gnu11 -Wall -Wextra -Werror -D_WIN32_WINNT=0x0600 -DDUCKDB_EXTENSION_NAME=ducksassy -I.deps-v1/sdk -Iinclude -Isrc -c src/host_v1.c -o $(V1_BUILD_DIR)/windows-host-check/host_v1.o
+	$(MINGW_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -Isrc -c src/ducksassy_core.c -o $(V1_BUILD_DIR)/windows-host-check/core.o
 release-v1:
 	cmake -S . -B $(V1_BUILD_DIR) -DCMAKE_BUILD_TYPE=Release -DDUCKSASSY_HOST=v1
 	cmake --build $(V1_BUILD_DIR) -j$(JOBS)

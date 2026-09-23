@@ -36,8 +36,8 @@ run_host_comparison <- function(output = "benchmarks/data/host_comparison", repe
   queries$dense_both <- sub("rc:=false", "rc:=false,cigar_format:='both'", queries$dense_cigar, fixed = TRUE)
   native_queries <- list(
     fastq_rows = sprintf("SELECT substr(name,5)::UBIGINT AS row_id, unnest(sassy_matches(substr(sequence,65,23),sequence,1,'iupac',false)) AS hit FROM read_fastq(%s)", sql_literal(fastq)),
-    fasta_panel = sprintf("SELECT 0::UBIGINT AS row_id, hit FROM read_fasta(%s,scan_mode:='sequential') r CROSS JOIN LATERAL unnest(sassy_matches_many(%s,r.sequence,2,'dna',false)) m(hit)", sql_literal(fasta), panel),
-    crispr_panel = sprintf("SELECT 0::UBIGINT AS row_id, hit FROM read_fasta(%s,scan_mode:='sequential') r CROSS JOIN LATERAL unnest(sassy_crispr_matches_many(%s,r.sequence,2)) m(hit)", sql_literal(fasta), array_sql(crispr)),
+    fasta_panel = sprintf("SELECT 0::UBIGINT AS row_id, unnest(sassy_matches_many(%s,r.sequence,2,'dna',false)) AS hit FROM read_fasta(%s,scan_mode:='sequential') r", panel, sql_literal(fasta)),
+    crispr_panel = sprintf("SELECT 0::UBIGINT AS row_id, unnest(sassy_crispr_matches_many(%s,r.sequence,2)) AS hit FROM read_fasta(%s,scan_mode:='sequential') r", array_sql(crispr), sql_literal(fasta)),
     dense_cigar = "SELECT i AS row_id, unnest(sassy_matches('abcdefghijklmno',repeat('ab!de!gh!jk!mn!#',128+(i%5)::INTEGER),5,'ascii',false)) AS hit FROM range(2048) r(i)"
   )
   native_queries$dense_both <- sub("'ascii',false", "'ascii',false,false,'both'", native_queries$dense_cigar, fixed = TRUE)

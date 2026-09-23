@@ -128,7 +128,8 @@ mkdir -p .deps-v1/cli
 curl -fL --retry 3 https://github.com/duckdb/duckdb/releases/download/v1.5.5/duckdb_cli-linux-amd64.zip -o .deps-v1/cli.zip
 unzip .deps-v1/cli.zip -d .deps-v1/cli
 make release-v1 sql-test-v1
-make release test sql-test oracle-test readme
+make release test sql-test oracle-test r-test readme
+make windows-host-check  # requires x86_64-w64-mingw32-gcc
 ```
 
 `test/native_load.py` checks native catalog types, repeated `LOAD`, fresh file
@@ -140,11 +141,50 @@ hosts; test-only scalar macros translate shared named fixtures into v1 calls.
 V1 file tests use explicit DuckHTS readers and lateral joins. Full grep scans
 reject a late invalid byte while `LIMIT 1` succeeds.
 
-Linux x86-64 is runtime-tested. MinGW GCC 12 compiles `host_v1.c` and
+Linux x86-64 is runtime-tested. MinGW GCC 13 compiles `host_v1.c` and
 `ducksassy_core.c` with `-Wall -Wextra -Werror`; Windows loading, Rust linkage
-and threaded runtime behavior are **not tested**. macOS and ARM hosts are not
-runtime-tested here. Build/export checks and sanitizer evidence do not replace
+and threaded runtime behavior are **not tested**. The CMake distribution build
+still targets Linux, macOS and Emscripten; Windows archive/link/metadata support
+remains packaging work. macOS and ARM hosts are not runtime-tested here. Build/export checks and sanitizer evidence do not replace
 those platform runs.
+
+Verification on Linux: both SQL suites and C ABI/dispatch tests pass, including
+the v2 macro collision probe; upstream CRISPR agrees across 36 profiles and 864
+guide/record comparisons. Nine SQL families pass through the R/DBI preview
+(`bcff503658`), and README rendering succeeds. ASan/LSan on the v1 C adapter/core
+passes native-only read-only/load/close/reopen tests without a leak report.
+The Rust archive is not sanitizer-instrumented. The source R package builds
+and passes `R CMD check --no-manual` with one NOTE:
+
+```text
+Namespace in Imports field not imported from: ‘Rduckhts’
+  All declared Imports should be used.
+```
+
+The full sanitizer suite with the existing DuckHTS binary reports:
+
+```text
+ERROR: LeakSanitizer: detected memory leaks
+    #2 ... in register_read_hts_index_function (.../duckhts.duckdb_extension+0x246969)
+    #2 ... in register_read_hts_header_function (.../duckhts.duckdb_extension+0x246899)
+    #2 ... in register_read_hts_index_spans_function (.../duckhts.duckdb_extension+0x246a39)
+SUMMARY: AddressSanitizer: 2503 byte(s) leaked in 16 allocation(s).
+```
+
+A process loading only DuckHTS reproduces that report
+(`.deps-v1/duckhts-only-lsan.log`). The combined SQL suite passes address checks
+with leak detection disabled; this does not establish dependency leak freedom.
+The shared dependency is outside this change's write scope.
+
+Tree-sitter anti-slop parses `src/ducksassy_core.c` with zero findings, but the
+full `src` scan cannot analyze the extension entrypoint macros and dispatcher
+attributes. Its diagnostic is:
+
+```text
+ERROR parse-error: Tree-sitter could not parse this source exactly; anti-slop did not run style rules.
+```
+
+This is a linter coverage limitation, not a clean whole-tree lint result.
 
 ## Measurements
 
@@ -157,14 +197,38 @@ including packed lists, must agree before timing.
 Nine alternating repetitions use persistent CLIs pinned to CPUs 16–19, with
 three calls per timing batch. Measurements include bind, local DuckHTS reads,
 search, output aggregation and JSON decoding, but not startup or full-hit
-verification. They compare complete host queries, not isolated vector-write
-cost. Raw timings, input/runtime hashes and exact-hit checks live in
+verification. All hosts use matching SELECT/UNNEST query shapes, with macros
+expanded on v2 and native positional calls on v1. They compare complete host
+queries, not isolated vector-write cost. Raw timings, input/runtime hashes and exact-hit checks live in
 `benchmarks/data/host_comparison/`.
+
+Median seconds per query; deltas are relative to packed-CIGAR baseline
+`a841d8d` on the same v2 runtime. Lower is faster.
+
+| Workload | Threads | Baseline v2 | Shared v2 | Delta | Released v1 | Delta |
+|---|---:|---:|---:|---:|---:|---:|
+| FASTQ rows | 1 | 0.2240 | 0.2217 | -1.0% | 0.2203 | -1.6% |
+| FASTQ rows | 4 | 0.2263 | 0.2240 | -1.0% | 0.2213 | -2.2% |
+| FASTA panel | 1 | 0.0557 | 0.0563 | +1.2% | 0.0447 | -19.8% |
+| FASTA panel | 4 | 0.0553 | 0.0517 | -6.6% | 0.0473 | -14.5% |
+| CRISPR panel | 1 | 0.0957 | 0.0953 | -0.3% | 0.0853 | -10.8% |
+| CRISPR panel | 4 | 0.0950 | 0.0957 | +0.7% | 0.0887 | -6.7% |
+| Dense text CIGAR | 1 | 0.3000 | 0.2973 | -0.9% | 0.2973 | -0.9% |
+| Dense text CIGAR | 4 | 0.2960 | 0.2950 | -0.3% | 0.3003 | +1.5% |
+| Dense both formats | 1 | 0.3200 | 0.3187 | -0.4% | 0.3173 | -0.8% |
+| Dense both formats | 4 | 0.3170 | 0.3190 | +0.6% | 0.3110 | -1.9% |
+
+All 30 full-hit multiset checks agree. Outputs contain 65,536 FASTQ hits,
+eight FASTA-panel hits, four CRISPR-panel hits and 266,237 dense hits per format.
+The shared-core v2 refactor shows no material slowdown in these measurements
+(maximum observed increase 1.2%). V1 also changes the DuckDB engine version;
+its differences cannot be attributed solely to the adapter. Thread settings
+are not evidence of scalable parallel work for the single-record FASTA scan.
 
 ## Community submission
 
 Before publication: run the released-host platform matrix (especially Windows
-loading, concurrent workers and close/reopen), build distribution archives,
+CMake/link support, loading, concurrent workers and close/reopen), build distribution archives,
 validate signatures/metadata and licensing against community-extension
 requirements, and decide the v1 artifact/version naming. Keep v2/R preview
 compatibility separate. Publishing or opening a submission requires explicit

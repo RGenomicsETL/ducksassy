@@ -1,18 +1,17 @@
 {
-  "baseline_revision": "57f94a023fedc33f8ca4b80333ea8a016cc45b49",
-  "measured_at_utc": "2026-09-23 17:31:06 UTC",
+  "baseline_revision": "a841d8df52198c62beface151de445a6dc9e9387",
+  "measured_at_utc": "2026-09-23 18:45:05 UTC",
   "sources": {
-    "src/ducksassy_core.c": "dea03658a6cb877ee57dbc232627b0a91a94fa410988b1a6a289b95818b37674",
-    "src/ducksassy_core.h": "f4568e6df97dda9bfa8d0dc9a32c4eabc7bf301ad1a69989caa9959c953ceb1e",
-    "src/host_v1.c": "86a6f596db848856ada7cb861f601493bda398db00c5f0e0e873e5b99430a43b",
-    "src/host_v2.c": "db3ba20d8dc61e1d2a47150539f057bb911f97ba961b1696415f3dcf4a29ce56",
-    "benchmarks/host_comparison.R": "20c99a017bde2444f359a87ef90e628bbf00e4fa72216f682282d289e10447b0",
+    "src/ducksassy_core.c": "487c3c1af79de1f0b595021d00ebc7ea2c04e61c8a2689899f30b980bdfc62b7",
+    "src/ducksassy_core.h": "30781d5c4422f0531a719433d66044bb65dd6e1a818cee6aa240e843ee7a6730",
+    "src/host_v1.c": "80b684fb7dfd0254694042b8377bff113a50b50ef7a367e4b797b51bba5cf6a3",
+    "src/host_v2.c": "48e6914359fccbfa5a43a2aa5983445ee9794241921cd49ef16a30728cc8f825",
+    "benchmarks/host_comparison.R": "3bf4f5b910e86a147f48dd10127893aead929fcc6ad2a6f0919cd15df2ea2401",
     "benchmarks/sequence_search.R": "5c18e6c50a095c7e4a19712e3270679b2e5f225d6905d4f34b45aa8b97a0df83",
-    "sql/ducksassy.sql": "3f050c3cf189a1489b5c51031290ff3c266dd22c5320db191f68395da59b7454",
-    "tools/embed_sql.py": "2e1d915c6a60bf7f8373f252e3a1e93cfb83637a00560652b8b26b22e652ca08",
-    "CMakeLists.txt": "10ed48a10203ed75486f00221c745a79a41481ddab2c73fba1a4b69b9e1e5ee5"
+    "sql/ducksassy.sql": "3fa7205c6d6a76383cb5b018f8d17a502d3e52d4af1e5530bfa7c8f495842f77",
+    "CMakeLists.txt": "74e3c94d30ebc33ef516a3f939b52b4f7a67c4dd29bf261a8dea4f173d5eb73b"
   },
-  "rust_archive_sha256": "c0e4076e63ee070c85cc9080e02bf5730953617cb63effc745a31f6f2a5816a2",
+  "rust_archive_sha256": "7208bb3730eb445a96ec388e822e45b87940e7e94d0921dbe9565d413925be77",
   "build": {
     "type": "Release (-O3 -DNDEBUG)",
     "c_flags": "-std=gnu11 -fPIC -fvisibility=hidden -Wall -Wextra -Werror=implicit-function-declaration -Werror=incompatible-pointer-types",
@@ -30,7 +29,7 @@
         }
       ],
       "cli_sha256": "cc449920df344bcd56a8d71227ff9cf4debc9cad03c3003fb064a313840e8c6c",
-      "extension_sha256": "70a494c2e37ec15d0f0148610e16ac6590d1db2fcc48636a2d71b8d8d083307f",
+      "extension_sha256": "2a96446f1c950fd7301739bea27577ea2aba75902adabca3fc8503625b968518",
       "backend": [
         {
           "name": "avx2",
@@ -74,7 +73,7 @@
         }
       ],
       "cli_sha256": "cc449920df344bcd56a8d71227ff9cf4debc9cad03c3003fb064a313840e8c6c",
-      "extension_sha256": "9665571bb567cf206f2b37bf5bb53358bbb3b7e0afe61dfe481415bd58dd7e92",
+      "extension_sha256": "7e952c4ab440c38348d875eb6af6f546c2e7a26ab5801671e7d786b1a9ce4c2b",
       "backend": [
         {
           "name": "avx2",
@@ -118,7 +117,7 @@
         }
       ],
       "cli_sha256": "3d33b1df037cb049155c393778df7853fafb23e9d49d7c9cacdde4dd67155788",
-      "extension_sha256": "4ccc8805427a2469ea5bd06de69d2f99c469925d3cf18d17deba9029bf600789",
+      "extension_sha256": "bf6c24c6d701b72d0f8ab158fb122f3be5eefa3f86c38ea989607e88c13260fa",
       "backend": [
         {
           "name": "avx2",
@@ -165,7 +164,7 @@
   "repetitions": 9,
   "batch_calls": 3,
   "cpus": "16-19",
-  "cpu": ["Architecture:                         x86_64", "CPU op-mode(s):                       32-bit, 64-bit", "Address sizes:                        46 bits physical, 48 bits virtual", "Byte Order:                           Little Endian", "CPU(s):                               20", "On-line CPU(s) list:                  0-19", "Vendor ID:                            GenuineIntel", "BIOS Vendor ID:                       Intel(R) Corporation", "Model name:                           13th Gen Intel(R) Core(TM) i5-13500", "BIOS Model name:                      13th Gen Intel(R) Core(TM) i5-13500 To Be Filled By O.E.M. CPU @ 2.4GHz", "BIOS CPU family:                      205", "CPU family:                           6", "Model:                                191", "Thread(s) per core:                   2", "Core(s) per socket:                   14", "Socket(s):                            1", "Stepping:                             2", "CPU(s) scaling MHz:                   24%", "CPU max MHz:                          4800.0000", "CPU min MHz:                          800.0000", "BogoMIPS:                             4992.00", "Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq tme rdpid movdiri movdir64b fsrm md_clear serialize pconfig arch_lbr ibt flush_l1d arch_capabilities", "Virtualization:                       VT-x", "L1d cache:                            544 KiB (14 instances)", "L1i cache:                            704 KiB (14 instances)", "L2 cache:                             11.5 MiB (8 instances)", "L3 cache:                             24 MiB (1 instance)", "NUMA node(s):                         1", "NUMA node0 CPU(s):                    0-19", "Vulnerability Gather data sampling:   Not affected", "Vulnerability Itlb multihit:          Not affected", "Vulnerability L1tf:                   Not affected", "Vulnerability Mds:                    Not affected", "Vulnerability Meltdown:               Not affected", "Vulnerability Mmio stale data:        Not affected", "Vulnerability Reg file data sampling: Mitigation; Clear Register File", "Vulnerability Retbleed:               Not affected", "Vulnerability Spec rstack overflow:   Not affected", "Vulnerability Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl", "Vulnerability Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization", "Vulnerability Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBPB conditional; RSB filling; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S", "Vulnerability Srbds:                  Not affected", "Vulnerability Tsx async abort:        Not affected"],
+  "cpu": ["Architecture:                         x86_64", "CPU op-mode(s):                       32-bit, 64-bit", "Address sizes:                        46 bits physical, 48 bits virtual", "Byte Order:                           Little Endian", "CPU(s):                               20", "On-line CPU(s) list:                  0-19", "Vendor ID:                            GenuineIntel", "BIOS Vendor ID:                       Intel(R) Corporation", "Model name:                           13th Gen Intel(R) Core(TM) i5-13500", "BIOS Model name:                      13th Gen Intel(R) Core(TM) i5-13500 To Be Filled By O.E.M. CPU @ 2.4GHz", "BIOS CPU family:                      205", "CPU family:                           6", "Model:                                191", "Thread(s) per core:                   2", "Core(s) per socket:                   14", "Socket(s):                            1", "Stepping:                             2", "CPU(s) scaling MHz:                   45%", "CPU max MHz:                          4800.0000", "CPU min MHz:                          800.0000", "BogoMIPS:                             4992.00", "Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq tme rdpid movdiri movdir64b fsrm md_clear serialize pconfig arch_lbr ibt flush_l1d arch_capabilities", "Virtualization:                       VT-x", "L1d cache:                            544 KiB (14 instances)", "L1i cache:                            704 KiB (14 instances)", "L2 cache:                             11.5 MiB (8 instances)", "L3 cache:                             24 MiB (1 instance)", "NUMA node(s):                         1", "NUMA node0 CPU(s):                    0-19", "Vulnerability Gather data sampling:   Not affected", "Vulnerability Itlb multihit:          Not affected", "Vulnerability L1tf:                   Not affected", "Vulnerability Mds:                    Not affected", "Vulnerability Meltdown:               Not affected", "Vulnerability Mmio stale data:        Not affected", "Vulnerability Reg file data sampling: Mitigation; Clear Register File", "Vulnerability Retbleed:               Not affected", "Vulnerability Spec rstack overflow:   Not affected", "Vulnerability Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl", "Vulnerability Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization", "Vulnerability Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBPB conditional; RSB filling; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S", "Vulnerability Srbds:                  Not affected", "Vulnerability Tsx async abort:        Not affected"],
   "session": ["R version 4.6.0 (2026-04-24)", "Platform: x86_64-pc-linux-gnu", "Running under: Ubuntu 24.04.3 LTS", "", "Matrix products: default", "BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 ", "LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so;  LAPACK version 3.12.0", "", "locale:", " [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              ", " [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    ", " [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   ", " [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 ", " [9] LC_ADDRESS=C               LC_TELEPHONE=C            ", "[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       ", "", "time zone: Europe/Berlin", "tzcode source: system (glibc)", "", "attached base packages:", "[1] stats     graphics  grDevices datasets  utils     methods   base     ", "", "loaded via a namespace (and not attached):", " [1] processx_3.9.0      compiler_4.6.0      R6_2.6.1           ", " [4] cli_3.6.5           tools_4.6.0         otel_0.2.0         ", " [7] bspm_0.5.7          duckknit_0.0.9.9000 knitr_1.51         ", "[10] jsonlite_2.0.0      xfun_0.57           digest_0.6.39      ", "[13] ps_1.9.3            rlang_1.3.0         evaluate_1.0.5     "],
   "timing": "Warm persistent CLI wall time for batches of three calls, divided by three; includes parse/bind, local reader, search, hit aggregation and JSON parsing; startup and full-hit verification excluded. Host order alternates each repetition; identical AVX2 Rust archive."
 }

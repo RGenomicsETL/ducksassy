@@ -83,15 +83,31 @@ make sdk-v1 release-v1
 
 ``` sql
 LOAD 'build-v1/ducksassy.duckdb_extension';
-SELECT sassy_count('ACGT', 'TTACGT', 0, rc := false);
+SELECT sassy_count('ACGT', 'TTACGT', 0, 'dna', false);
 SELECT * FROM sassy_grep('error', 'error: disk full', 0);
+SELECT * FROM sassy_backend_info();
 ```
 
 Download the CLI separately as described in
 [host architecture, setup and measurements](docs/v1-host.md).
-File helpers require an explicit local `LOAD` of DuckHTS; value and
-named-relation searches do not. The v1 build uses `DUCKSASSY_HOST=v1`;
-the default is `v2`. Use separate build directories for the two artifacts.
+V1 `LOAD` writes no catalog entries and works on a read-only database.
+Scalars use positional trailing options: `alphabet, rc, all_endpoints, cigar_format` for matches, and `pam_length, allow_pam_edits, max_n_frac, rc`
+for CRISPR. Defaults and VARCHAR/BLOB support match v2. V1 has no file or
+relation-name helpers; compose native calls with a table, CTE or explicitly
+loaded DuckHTS reader:
+
+``` sql
+LOAD '/absolute/path/duckhts.duckdb_extension';
+SELECT r.*, hit
+FROM read_fasta('reference.fa', scan_mode := 'sequential') r
+CROSS JOIN LATERAL unnest(
+    sassy_matches('ACGTAGG', r.sequence, 1, 'iupac', false, false, 'both')
+) AS matches(hit);
+```
+
+Use `read_fastq(...)` for reads, `_many` with a pattern list for panels, or
+`sassy_crispr_matches(guide, r.sequence, k)` for CRISPR. The v1 build uses
+`DUCKSASSY_HOST=v1`; the default is `v2`. Keep their build directories separate.
 
 ### Pinned C API v2 host
 
@@ -115,7 +131,10 @@ INSTALL 'build/ducksassy.duckdb_extension';
 ```
 
 The lambda setting is required by DuckHTS 1.5.2 and applies to the whole
-database instance, so use a dedicated one. The v2 bootstrap macros are connection-scoped; v1 installs database-scoped macros.
+database instance, so use a dedicated one. V2 keeps its connection-scoped
+macros, `:=` scalar options and file/relation helpers. Positional trailing
+options are v1-only: a same-named macro shadows a native function in v2
+([binding probe](test/v2_macro_collision.sql)).
 Supported host versions are pinned in
 [ducksassy-package.json](ducksassy-package.json). When upgrading, move an
 outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
