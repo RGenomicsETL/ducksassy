@@ -95,7 +95,11 @@ def by_category(functions: list[dict[str, object]]) -> OrderedDict[str, list[dic
 
 def render_reference(functions: list[dict[str, object]]) -> str:
     lines = ["# Function reference", "", "Generated from `functions.yaml` by "
-             "`scripts/render_function_catalog.py`.", ""]
+             "`scripts/render_function_catalog.py`.", "",
+             "Scalar options are positional: the stable C extension API has no named scalar "
+             "arguments, so `alphabet := 'dna'` does not bind. Pass options in the order "
+             "shown and omit trailing ones to use their defaults, for example "
+             "`sassy_matches('ACGT', text, 1, 'dna', false)`.", ""]
     for category, entries in by_category(functions).items():
         lines.extend([f"## {category}", "", "| Function | Kind | Description |", "| --- | --- | --- |"])
         for entry in entries:
