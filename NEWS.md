@@ -2,7 +2,8 @@
 
 - Add `sassy_matches_packed`, `sassy_matches_many_packed` and `*_both` for
   SAM-oriented BAM `UINTEGER[]` operations. Text CIGAR remains in pattern
-  direction; packed-only calls do not build text CIGAR.
+  direction; packed-only calls do not build text CIGAR. The overhang variants
+  expose partial alignments with query soft clips.
 
 - Reuse hit and CIGAR buffers per searcher and keep successful error bookkeeping
   allocation-free. C callers can return consumed results with

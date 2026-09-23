@@ -63,6 +63,7 @@ typedef struct {
     bool panel;
     bool packed;
     bool both;
+    bool overhang;
 } search_operation;
 
 static const search_operation operations[] = {
@@ -72,6 +73,8 @@ static const search_operation operations[] = {
     {.name = "__sassy_matches_many_packed", .kind = OP_MATCHES, .panel = true, .packed = true},
     {.name = "__sassy_matches_both", .kind = OP_MATCHES, .panel = false, .packed = true, .both = true},
     {.name = "__sassy_matches_many_both", .kind = OP_MATCHES, .panel = true, .packed = true, .both = true},
+    {.name = "__sassy_matches_packed_overhang", .kind = OP_MATCHES, .packed = true, .overhang = true},
+    {.name = "__sassy_matches_both_overhang", .kind = OP_MATCHES, .packed = true, .both = true, .overhang = true},
     {.name = "__sassy_count", .kind = OP_COUNT, .panel = false},
     {.name = "__sassy_count_many", .kind = OP_COUNT, .panel = true},
     {.name = "__sassy_contains", .kind = OP_CONTAINS, .panel = false},
@@ -469,7 +472,8 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
                                    .all_endpoints =
                                        boolean_at(&views[ARG_ALL_ENDPOINTS], row) ? 1U : 0U,
                                    .include_cigar = output_hits && hits.text ? 1U : 0U,
-                                   .reserved = operation->packed ? SASSY_C_PACKED_CIGAR : 0U};
+                                   .reserved = (operation->packed ? SASSY_C_PACKED_CIGAR : 0U) |
+                                               (operation->overhang ? SASSY_C_PARTIAL_OVERHANG : 0U)};
 
         sassy_c_slice text = byte_span(&views[ARG_TEXT], row);
         sassy_c_slice single_pattern;

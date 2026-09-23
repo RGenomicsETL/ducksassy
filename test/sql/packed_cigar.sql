@@ -30,6 +30,20 @@ SELECT CASE WHEN (sassy_matches_packed('ACGTTGCA', 'GGACGTTTGCACC', 1, alphabet 
     AND sassy_matches_packed('ACGTTGCA', 'GGGGGGGGGG', 0) = []
     THEN true ELSE error('packed-only, panel or NULL contract') END;
 
+WITH partials(text, strand, start_pos, end_pos) AS (
+    VALUES ('ATCGGGGGGGGGG', '+', 4, 8), ('CGATGGGGGGGGG', '-', 0, 4)
+), observed AS (
+    SELECT p.*, hit FROM partials p,
+         UNNEST(sassy_matches_both_overhang('ATCGATCG', p.text, 2)) t(hit)
+    WHERE hit.strand = p.strand AND hit.pattern_start = p.start_pos
+          AND hit.pattern_end = p.end_pos AND hit.text_start = 0 AND hit.cigar = '4='
+)
+SELECT CASE WHEN count(*) = 2 AND bool_and(
+    hit.cigar_ops = [68::UINTEGER, 71] AND hit.text_end - hit.text_start = 4
+    AND list_sum(list_transform(hit.cigar_ops, x -> IF((x & 15) IN (7,8,2), x >> 4, 0))) = 4
+    AND list_sum(list_transform(hit.cigar_ops, x -> IF((x & 15) IN (7,8,1), x >> 4, 0))) = 4)
+    THEN true ELSE error('partial alignment and SAM clip orientation') END FROM observed;
+
 WITH inputs AS (
     SELECT i, CASE WHEN i % 3 = 0 THEN 'GGACGTTGCACC'
                    WHEN i % 3 = 1 THEN 'GGTGCAAACGTCC'

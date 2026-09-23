@@ -9,6 +9,7 @@ use std::{ptr, slice};
 
 const BACKEND_TABLE_VERSION: u32 = 2;
 const PACKED_CIGAR: u32 = 1;
+const PARTIAL_OVERHANG: u32 = 2;
 const MAX_BAM_RUN: u32 = (1 << 28) - 1;
 const MAX_PATTERNS: usize = 4096;
 const MAX_PATTERN_BYTES: usize = 4096;
@@ -77,7 +78,9 @@ enum Engine {
 
 pub struct SassySearcher {
     engine: Engine,
+    partial_engine: Option<Engine>,
     alphabet: u32,
+    reverse_complement: bool,
     poisoned: bool,
     spare_result: Option<Box<SassyResult>>,
 }
@@ -187,7 +190,7 @@ fn validate_alphabet(seq: &[u8], alphabet: u32) -> Result<(), Error> {
 
 fn validate_options(opts: &SassyOptions) -> Result<(), Error> {
     if opts.struct_size as usize != std::mem::size_of::<SassyOptions>()
-        || opts.reserved & !PACKED_CIGAR != 0
+        || opts.reserved & !(PACKED_CIGAR | PARTIAL_OVERHANG) != 0
         || opts.all_endpoints > 1
         || opts.include_cigar > 1
     {
@@ -348,7 +351,9 @@ unsafe extern "C" fn sassy_c_searcher_new(
         unsafe {
             *out = Box::into_raw(Box::new(SassySearcher {
                 engine,
+                partial_engine: None,
                 alphabet,
+                reverse_complement: rc,
                 poisoned: false,
                 spare_result: None,
             }));
@@ -395,13 +400,23 @@ unsafe extern "C" fn sassy_c_search_many(
         let opts = unsafe { &*options };
         let (state, patterns, text) =
             unsafe { search_inputs(searcher, patterns, n_patterns, text, k, opts)? };
+        if opts.reserved & PARTIAL_OVERHANG != 0 && state.alphabet != 2 {
+            return Err(invalid("overhang requires IUPAC"));
+        }
         let mut result = state.spare_result.take().unwrap_or_default();
         if !text.is_empty() {
             for (i, p) in patterns.iter().enumerate() {
                 let pattern = unsafe { bytes(*p)? };
                 // An unwinding kernel must not leave a reusable, apparently healthy searcher.
                 state.poisoned = true;
-                let matches = match &mut state.engine {
+                let engine = if opts.reserved & PARTIAL_OVERHANG != 0 {
+                    let rc = state.reverse_complement;
+                    state.partial_engine.get_or_insert_with(||
+                        Engine::Iupac(Searcher::<Iupac>::new(rc, Some(0.5))))
+                } else {
+                    &mut state.engine
+                };
+                let matches = match engine {
                     Engine::Ascii(s) => {
                         if opts.all_endpoints != 0 {
                             s.search_all(pattern, text, k as usize)
@@ -1005,7 +1020,7 @@ mod tests {
         append_matches(&mut result, vec![substitution], 0, 4, &opts).unwrap();
         assert_eq!(result.ops, vec![(1 << 4) | 8, (3 << 4) | 7]);
         assert_eq!(aligned_text_from_packed(&result.ops, false), "1X3=");
-        let bad = SassyOptions { reserved: PACKED_CIGAR | 2, ..opts };
+        let bad = SassyOptions { reserved: PACKED_CIGAR | 4, ..opts };
         assert!(validate_options(&bad).is_err());
     }
     #[test]

@@ -32,6 +32,15 @@ CREATE OR REPLACE TEMP MACRO sassy_matches_many_both(patterns, text, k,
     alphabet := 'iupac', rc := true, all_endpoints := false) AS
     __sassy_matches_many_both(patterns, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
         all_endpoints::BOOLEAN);
+-- Partial searches use Sassy's overhang penalty alpha=0.5.
+CREATE OR REPLACE TEMP MACRO sassy_matches_packed_overhang(pattern, text, k,
+    alphabet := 'iupac', rc := true, all_endpoints := false) AS
+    __sassy_matches_packed_overhang(pattern, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
+        all_endpoints::BOOLEAN);
+CREATE OR REPLACE TEMP MACRO sassy_matches_both_overhang(pattern, text, k,
+    alphabet := 'iupac', rc := true, all_endpoints := false) AS
+    __sassy_matches_both_overhang(pattern, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
+        all_endpoints::BOOLEAN);
 CREATE OR REPLACE TEMP MACRO sassy_count(pattern, text, k,
     alphabet := 'iupac', rc := true, all_endpoints := false) AS
     __sassy_count(pattern, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,

@@ -274,7 +274,9 @@ Use `sassy_matches_packed` (or `sassy_matches_many_packed`) for typed
 (or `sassy_matches_many_both`) to receive the existing text CIGAR and packed
 ops together. The arguments and defaults match `sassy_matches`. Packed-only
 materialization skips string formatting but allocates a typed list for each hit;
-no before/after timing has been measured.
+no before/after timing has been measured. For partial alignments, use
+`sassy_matches_packed_overhang` or `sassy_matches_both_overhang` (IUPAC only,
+Sassy overhang penalty `alpha=0.5`); their packed ops include soft clips.
 
 ```sql
 SELECT hit.text_start, hit.cigar_ops
