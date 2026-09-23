@@ -20,20 +20,28 @@ CMAKE_EXTRA_BUILD_FLAGS += -DDUCKSASSY_HOST=v1 -DDUCKSASSY_DISTRIBUTION=ON -DDUC
 ifneq ($(OSX_BUILD_ARCH),)
 CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_OSX_ARCHITECTURES=$(OSX_BUILD_ARCH)
 ifeq ($(OSX_BUILD_ARCH),x86_64)
-CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_SYSTEM_PROCESSOR=x86_64 -DCMAKE_SYSTEM_NAME=Darwin -DRUST_TARGET=x86_64-apple-darwin
+OSX_RUST_TARGET := x86_64-apple-darwin
+CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_SYSTEM_PROCESSOR=x86_64
 else
-CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_SYSTEM_NAME=Darwin -DRUST_TARGET=aarch64-apple-darwin
+OSX_RUST_TARGET := aarch64-apple-darwin
+CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_SYSTEM_PROCESSOR=arm64
 endif
+CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_SYSTEM_NAME=Darwin -DRUST_TARGET=$(OSX_RUST_TARGET)
 endif
 include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
-.PHONY: configure release debug test_release test_debug distribution-sdk
+.PHONY: configure release debug test_release test_debug distribution-sdk rust-target
 configure: venv platform extension_version distribution-sdk
 distribution-sdk:
 	python3 tools/fetch_v1_sdk.py configure/sdk-v1
-release: build_extension_with_metadata_release
-debug: build_extension_with_metadata_debug
+# macOS runners may build for the other architecture; install its Rust std.
+rust-target:
+ifneq ($(OSX_RUST_TARGET),)
+	rustup target add $(OSX_RUST_TARGET)
+endif
+release: rust-target build_extension_with_metadata_release
+debug: rust-target build_extension_with_metadata_debug
 test_release: test_extension_release
 test_debug: test_extension_debug
 

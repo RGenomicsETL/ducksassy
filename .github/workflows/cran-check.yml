@@ -27,6 +27,8 @@ jobs:
         with:
           r-version: release
           use-public-rspm: true
+          # pak ignores DESCRIPTION Additional_repositories.
+          extra-repositories: https://duckdb.r-universe.dev https://rgenomicsetl.r-universe.dev
       - name: Stage self-contained package sources
         run: Rscript tools/stage_r_package.R
       - uses: r-lib/actions/setup-r-dependencies@v2

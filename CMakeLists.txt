@@ -30,8 +30,10 @@ endif()
 if(NOT RUST_TARGET)
     message(FATAL_ERROR "Could not determine Rust target")
 endif()
-if(CMAKE_CROSSCOMPILING AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    message(FATAL_ERROR "Cross compilation is supported only with the Emscripten wasm toolchain")
+# extension-ci-tools sets CMAKE_SYSTEM_NAME=Darwin for macOS builds, which CMake
+# reports as cross compilation even on a native host.
+if(CMAKE_CROSSCOMPILING AND NOT CMAKE_SYSTEM_NAME MATCHES "^(Emscripten|Darwin)$")
+    message(FATAL_ERROR "Cross compilation is supported only for Emscripten wasm and macOS")
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND NOT RUST_TARGET MATCHES "^wasm32-")
     message(FATAL_ERROR "Emscripten builds require a wasm32 Rust target (got ${RUST_TARGET})")
