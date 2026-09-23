@@ -46,6 +46,7 @@ typedef enum {
     HIT_COST,
     HIT_STRAND,
     HIT_CIGAR,
+    HIT_CIGAR_OPS,
     HIT_FIELD_COUNT
 } hit_field;
 
@@ -60,11 +61,17 @@ typedef struct {
     const char *name;
     operation_kind kind;
     bool panel;
+    bool packed;
+    bool both;
 } search_operation;
 
 static const search_operation operations[] = {
     {.name = "__sassy_matches", .kind = OP_MATCHES, .panel = false},
     {.name = "__sassy_matches_many", .kind = OP_MATCHES, .panel = true},
+    {.name = "__sassy_matches_packed", .kind = OP_MATCHES, .panel = false, .packed = true},
+    {.name = "__sassy_matches_many_packed", .kind = OP_MATCHES, .panel = true, .packed = true},
+    {.name = "__sassy_matches_both", .kind = OP_MATCHES, .panel = false, .packed = true, .both = true},
+    {.name = "__sassy_matches_many_both", .kind = OP_MATCHES, .panel = true, .packed = true, .both = true},
     {.name = "__sassy_count", .kind = OP_COUNT, .panel = false},
     {.name = "__sassy_count_many", .kind = OP_COUNT, .panel = true},
     {.name = "__sassy_contains", .kind = OP_CONTAINS, .panel = false},
@@ -84,6 +91,9 @@ typedef struct {
     size_t hit_count;
     const uint8_t *cigars;
     size_t cigar_bytes;
+    const sassy_c_op_span *spans;
+    const uint32_t *ops;
+    size_t op_count;
 } hit_batch_view;
 
 static duckdb_v2_str string_view(const char *text) {
@@ -235,6 +245,9 @@ typedef struct {
     uint64_t *struct_validity;
     duckdb_v2_arena_handle cigar_arena;
     idx_t capacity;
+    idx_t op_used;
+    bool packed;
+    bool text;
 } hit_output;
 
 static bool resize_hit_output(hit_output *output, idx_t size,
@@ -245,7 +258,7 @@ static bool resize_hit_output(hit_output *output, idx_t size,
     DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(output->vector,
                                                           &output->struct_validity, &detail));
     // Resizing can move storage. Refresh every borrowed pointer and the arena.
-    for (idx_t field = 0; field < HIT_FIELD_COUNT; ++field) {
+    for (idx_t field = 0; field < (output->packed ? HIT_FIELD_COUNT : HIT_CIGAR_OPS); ++field) {
         DUCKDB_CALL(duckdb_v2_vector_get_child(output->vector, field,
                                                &output->fields[field], &detail));
         DUCKDB_CALL(duckdb_v2_vector_set_size(output->fields[field], size, &detail));
@@ -300,11 +313,36 @@ static bool append_hits(hit_output *output, const hit_batch_view *batch, idx_t o
         }
         const uint8_t *cigar = hit->cigar_length ? batch->cigars + hit->cigar_offset : NULL;
         duckdb_v2_bytes *cigar_output = &((duckdb_v2_bytes *)field_data[HIT_CIGAR])[position];
-        DUCKDB_CALL(
-            write_bytes(output->cigar_arena, cigar_output, cigar, (size_t)hit->cigar_length, &detail));
+        if (output->text) {
+            DUCKDB_CALL(write_bytes(output->cigar_arena, cigar_output, cigar,
+                                    (size_t)hit->cigar_length, &detail));
+        } else {
+            DUCKDB_CALL(duckdb_v2_vector_set_null(output->fields[HIT_CIGAR], position, &detail));
+        }
+        if (output->packed) {
+            if (!batch->spans || index >= batch->hit_count ||
+                batch->spans[index].offset > batch->op_count ||
+                batch->spans[index].length > batch->op_count - batch->spans[index].offset ||
+                batch->spans[index].length > SIZE_MAX / sizeof(uint32_t) - output->op_used) {
+                INPUT_ERROR("ducksassy: invalid packed CIGAR slab bounds");
+            }
+            idx_t length = (idx_t)batch->spans[index].length;
+            duckdb_v2_vector_handle child = NULL;
+            void *child_data = NULL;
+            DUCKDB_CALL(duckdb_v2_vector_get_child(output->fields[HIT_CIGAR_OPS], 0, &child, &detail));
+            DUCKDB_CALL(duckdb_v2_vector_set_size(child, output->op_used + length, &detail));
+            DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(child, &child_data, &detail));
+            if (length) {
+                memcpy((uint32_t *)child_data + output->op_used,
+                       batch->ops + batch->spans[index].offset, length * sizeof(uint32_t));
+            }
+            ((duckdb_v2_list_entry *)field_data[HIT_CIGAR_OPS])[position] =
+                (duckdb_v2_list_entry){output->op_used, length};
+            output->op_used += length;
+        }
         mark_valid(output->struct_validity, position);
-        for (idx_t field = 0; field < HIT_FIELD_COUNT; ++field) {
-            mark_valid(output->validity[field], position);
+        for (idx_t field = 0; field < (output->packed ? HIT_FIELD_COUNT : HIT_CIGAR_OPS); ++field) {
+            if (field != HIT_CIGAR || output->text) mark_valid(output->validity[field], position);
         }
     }
     success = true;
@@ -340,6 +378,8 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
     if (!operation || !worker) {
         INPUT_ERROR("ducksassy: missing function/worker state");
     }
+    hits.packed = operation->packed;
+    hits.text = !operation->packed || operation->both;
     bool crispr = operation->kind == OP_CRISPR;
     bool output_hits = operation->kind == OP_MATCHES || crispr;
     uint32_t argument_count = crispr ? CRISPR_ARGUMENT_COUNT : SEARCH_ARGUMENT_COUNT;
@@ -428,7 +468,8 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         sassy_c_options options = {.struct_size = sizeof(options),
                                    .all_endpoints =
                                        boolean_at(&views[ARG_ALL_ENDPOINTS], row) ? 1U : 0U,
-                                   .include_cigar = output_hits ? 1U : 0U};
+                                   .include_cigar = output_hits && hits.text ? 1U : 0U,
+                                   .reserved = operation->packed ? SASSY_C_PACKED_CIGAR : 0U};
 
         sassy_c_slice text = byte_span(&views[ARG_TEXT], row);
         sassy_c_slice single_pattern;
@@ -481,6 +522,10 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
         hit_batch_view batch = {0};
         if (sassy_c_result_view(result, &batch.hits, &batch.hit_count, &batch.cigars,
                                 &batch.cigar_bytes) != SASSY_C_OK) {
+            INPUT_ERROR(sassy_c_last_error());
+        }
+        if (operation->packed && sassy_c_result_ops_view(result, &batch.spans, &batch.ops,
+                                                          &batch.op_count) != SASSY_C_OK) {
             INPUT_ERROR(sassy_c_last_error());
         }
         if (operation->kind == OP_COUNT) {
@@ -558,6 +603,11 @@ static bool register_operation(duckdb_v2_extension_handle extension,
     const char *return_type = "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, "
                               "pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand "
                               "VARCHAR, cigar VARCHAR)[]";
+    if (operation->packed) {
+        return_type = "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, "
+                      "pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand "
+                      "VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]";
+    }
     if (operation->kind == OP_COUNT) {
         return_type = "UBIGINT";
     } else if (operation->kind == OP_CONTAINS) {

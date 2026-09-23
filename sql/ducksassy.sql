@@ -14,6 +14,24 @@ CREATE OR REPLACE TEMP MACRO sassy_matches_many(patterns, text, k,
     alphabet := 'iupac', rc := true, all_endpoints := false) AS
     __sassy_matches_many(patterns, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
         all_endpoints::BOOLEAN);
+-- Packed mode leaves cigar NULL and emits SAM-oriented BAM uint32 ops.
+-- Both mode retains the pattern-oriented text and emits packed ops.
+CREATE OR REPLACE TEMP MACRO sassy_matches_packed(pattern, text, k,
+    alphabet := 'iupac', rc := true, all_endpoints := false) AS
+    __sassy_matches_packed(pattern, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
+        all_endpoints::BOOLEAN);
+CREATE OR REPLACE TEMP MACRO sassy_matches_many_packed(patterns, text, k,
+    alphabet := 'iupac', rc := true, all_endpoints := false) AS
+    __sassy_matches_many_packed(patterns, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
+        all_endpoints::BOOLEAN);
+CREATE OR REPLACE TEMP MACRO sassy_matches_both(pattern, text, k,
+    alphabet := 'iupac', rc := true, all_endpoints := false) AS
+    __sassy_matches_both(pattern, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
+        all_endpoints::BOOLEAN);
+CREATE OR REPLACE TEMP MACRO sassy_matches_many_both(patterns, text, k,
+    alphabet := 'iupac', rc := true, all_endpoints := false) AS
+    __sassy_matches_many_both(patterns, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
+        all_endpoints::BOOLEAN);
 CREATE OR REPLACE TEMP MACRO sassy_count(pattern, text, k,
     alphabet := 'iupac', rc := true, all_endpoints := false) AS
     __sassy_count(pattern, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN,
