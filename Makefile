@@ -17,6 +17,17 @@ TARGET_DUCKDB_VERSION := $(shell python3 -c 'import json; print(json.load(open("
 DUCKDB_TEST_VERSION := $(shell python3 -c 'import json; print(json.load(open("ducksassy-package.json"))["v1_host"]["duckdb_version"].removeprefix("v"))')
 EXTENSION_VERSION := $(shell python3 -c 'import json; print(json.load(open("ducksassy-package.json"))["version"])')
 CMAKE_EXTRA_BUILD_FLAGS += -DDUCKSASSY_HOST=v1 -DDUCKSASSY_DISTRIBUTION=ON -DDUCKDB_CAPI_DIR=$(CURDIR)/configure/sdk-v1 -DSASSY_CARGO_JOBS=$(JOBS)
+ifneq ($(DUCKDB_PLATFORM),)
+CMAKE_EXTRA_BUILD_FLAGS += -DDUCKDB_PLATFORM=$(DUCKDB_PLATFORM)
+endif
+ifneq ($(filter windows_amd64_mingw windows_amd64_rtools,$(DUCKDB_PLATFORM)),)
+DISTRIBUTION_RUST_TARGET := x86_64-pc-windows-gnu
+CMAKE_EXTRA_BUILD_FLAGS += -DRUST_TARGET=$(DISTRIBUTION_RUST_TARGET)
+endif
+ifneq ($(filter wasm_%,$(DUCKDB_PLATFORM)),)
+DISTRIBUTION_RUST_TARGET := wasm32-unknown-emscripten
+CMAKE_EXTRA_BUILD_FLAGS += -DRUST_TARGET=$(DISTRIBUTION_RUST_TARGET)
+endif
 ifneq ($(OSX_BUILD_ARCH),)
 CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_OSX_ARCHITECTURES=$(OSX_BUILD_ARCH)
 ifeq ($(OSX_BUILD_ARCH),x86_64)
@@ -44,10 +55,24 @@ endif
 configure: venv platform extension_version distribution-sdk
 distribution-sdk:
 	python3 tools/fetch_v1_sdk.py configure/sdk-v1
-# macOS runners may build for the other architecture; install its Rust std.
+# Install std into the project's pinned toolchain, not the runner's default.
+# Native developers need only their host target.
 rust-target:
-ifneq ($(OSX_RUST_TARGET),)
-	rustup target add $(OSX_RUST_TARGET)
+ifneq ($(strip $(OSX_RUST_TARGET) $(DISTRIBUTION_RUST_TARGET)),)
+	rustup target add $(OSX_RUST_TARGET) $(DISTRIBUTION_RUST_TARGET)
+endif
+build_extension_library_release build_extension_library_debug: rust-target
+link_wasm_release: build_extension_library_release
+link_wasm_debug: build_extension_library_debug
+# Emscripten 3.1.71's Binaryen does not recognize Rust 1.91's bulk-memory-opt
+# feature tag. -O1 skips the post-link optimizer; Rust remains release-optimized.
+# Upstream's final emcc command does not forward its CMake feature flags.
+ifeq ($(DUCKDB_PLATFORM),wasm_mvp)
+link_wasm_release link_wasm_debug: export EMCC_CFLAGS = -O1
+else ifeq ($(DUCKDB_PLATFORM),wasm_eh)
+link_wasm_release link_wasm_debug: export EMCC_CFLAGS = -O1 -fwasm-exceptions
+else ifeq ($(DUCKDB_PLATFORM),wasm_threads)
+link_wasm_release link_wasm_debug: export EMCC_CFLAGS = -O1 -fwasm-exceptions -pthread -msimd128 -mbulk-memory
 endif
 release: rust-target build_extension_with_metadata_release
 debug: rust-target build_extension_with_metadata_debug
@@ -67,6 +92,9 @@ sdk:
 	python3 tools/fetch_sdk.py $(DUCKDB_CAPI_DIR)
 sdk-v1:
 	python3 tools/fetch_v1_sdk.py
+.PHONY: wasm-playwright-test
+wasm-playwright-test:
+	bash scripts/start_duckdb_wasm_local_test.sh --test
 windows-host-check:
 	mkdir -p $(V1_BUILD_DIR)/windows-host-check
 	$(MINGW_CC) -std=gnu11 -Wall -Wextra -Werror -D_WIN32_WINNT=0x0600 -DDUCKDB_EXTENSION_NAME=ducksassy -I.deps-v1/sdk -Iinclude -Isrc -c src/host_v1.c -o $(V1_BUILD_DIR)/windows-host-check/host_v1.o

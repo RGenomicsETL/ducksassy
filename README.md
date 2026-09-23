@@ -115,6 +115,10 @@ Use `read_fastq(...)` for reads, `_many` with a pattern list for panels, or
 `DUCKSASSY_HOST=v1`; standalone CMake defaults to `v2`. Keep their build directories separate.
 Distribution CI uses `make configure release test_release`, which produces the
 v1 artifact under `build/release/`; see the [CI contract](docs/v1-host.md#distribution-and-ci).
+The distribution matrix covers Linux and macOS x86-64/ARM64, plus Windows x86-64
+MinGW and Rtools. MSVC is unsupported. Wasm MVP/EH pass browser SQL probes but
+remain excluded because Rust panic recovery fails; Wasm threads also require
+an atomics-enabled Rust standard library. See the [portable build evidence](docs/v1-host.md#portable-builds).
 
 ### Pinned C API v2 host
 
@@ -509,9 +513,11 @@ library; an unavailable request returns an error, and changing it requires a
 fresh process.
 `scalar` follows Sassy’s baseline and includes SSE2 on x86-64; SSE4.1 has no
 separate tier. Linux x86-64 baseline and AVX2 are tested; AVX-512 is compiled
-but unexecuted, and aarch64/NEON is unverified. Emscripten builds select
-`wasm128` at compile time. CI typechecks the Rust wasm target; a linked
-DuckDB-Wasm extension has not been validated.
+but unexecuted, and aarch64/NEON is unverified here. Windows MinGW selects AVX2
+under Wine with DuckDB R 1.5.5. Emscripten MVP/EH probes use only `scalar`;
+`wasm128` is reserved for the threaded build. Browser SQL tests verify the
+scalar catalog and examples, but Wasm distribution is blocked by Rust’s
+exception/shared-memory compatibility; see [the platform checks](docs/v1-host.md#portable-builds).
 
 </details>
 <details>
