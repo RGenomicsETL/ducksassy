@@ -29,12 +29,11 @@ jobs:
           use-public-rspm: true
           # pak ignores DESCRIPTION Additional_repositories.
           extra-repositories: https://duckdb.r-universe.dev https://rgenomicsetl.r-universe.dev
-      - name: Stage self-contained package sources
-        run: Rscript tools/stage_r_package.R
+      - name: Bootstrap package sources and reject drift from committed copies
+        run: make r-bootstrap-check
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           working-directory: r/Rducksassy
-          # DESCRIPTION Additional_repositories supplies both R universes.
           extra-packages: |
             any::rcmdcheck
             any::jsonlite

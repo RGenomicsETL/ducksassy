@@ -1,0 +1,17 @@
+R package: the tarball ships no rust/examples, and Cargo rejects a manifest
+that declares a missing example target.
+
+--- a/src/extension/rust/Cargo.toml
++++ b/src/extension/rust/Cargo.toml
+@@ -24,11 +24,6 @@
+ # simd128 implementation, so opt into Sassy's portable fallback guard.
+ backend-wasm128 = ["sassy/scalar"]
+ 
+-# The benchmark links the scalar backend table directly.
+-[[example]]
+-name = "adapter_bench"
+-required-features = ["backend-scalar"]
+-
+ [profile.release]
+ lto = false
+ codegen-units = 1

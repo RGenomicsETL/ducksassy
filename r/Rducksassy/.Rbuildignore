@@ -6,3 +6,6 @@
 ^src/build$
 ^src/extension/rust/target$
 ^src/extension/build$
+^bootstrap[.]R$
+^tools/sources[.]tsv$
+^tools/patches$

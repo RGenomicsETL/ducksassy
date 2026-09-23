@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all help setup setup-data sdk sdk-v1 vendor-rust r-package r-readme site configure-v2 release-v2 release-v1 test-v2 sql-test sql-test-v1 oracle-test r-test readme benchmarks clean windows-host-check
+.PHONY: all help setup setup-data sdk sdk-v1 vendor-rust r-bootstrap r-bootstrap-check r-package r-readme site configure-v2 release-v2 release-v1 test-v2 sql-test sql-test-v1 oracle-test r-test readme benchmarks clean windows-host-check
 BUILD_DIR ?= build
 MINGW_CC ?= x86_64-w64-mingw32-gcc
 DUCKDB_CAPI_DIR ?= $(CURDIR)/duckdb_capi
@@ -47,7 +47,7 @@ test_debug: test_extension_debug
 
 all: release
 help:
-	@printf '%s\n' 'Distribution v1: configure release debug test_release test_debug (build/release or build/debug)' 'Preview v2: configure-v2 release-v2 test-v2 sql-test r-test oracle-test readme (build/)' 'Local v1: sdk-v1 release-v1 sql-test-v1 (build-v1/)' 'R package: r-package; documentation: site (site/)'
+	@printf '%s\n' 'Distribution v1: configure release debug test_release test_debug (build/release or build/debug)' 'Preview v2: configure-v2 release-v2 test-v2 sql-test r-test oracle-test readme (build/)' 'Local v1: sdk-v1 release-v1 sql-test-v1 (build-v1/)' 'R package: r-bootstrap r-bootstrap-check r-package; documentation: site (site/)'
 setup:
 	git submodule update --init
 	python3 tools/fetch_sdk.py $(DUCKDB_CAPI_DIR)
@@ -70,8 +70,13 @@ sql-test-v1: release-v1
 	python3 test/native_load.py --host v1 --duckdb $(V1_DUCKDB) --extension $(V1_BUILD_DIR)/ducksassy.duckdb_extension
 vendor-rust:
 	Rscript tools/vendor-rust.R
-r-package:
-	Rscript tools/stage_r_package.R
+r-bootstrap:
+	cd r/Rducksassy && Rscript bootstrap.R ../..
+# Fails when committed package copies differ from what bootstrap generates.
+r-bootstrap-check: r-bootstrap
+	git diff --exit-code -- r/Rducksassy
+	test -z "$$(git status --porcelain --untracked-files=all -- r/Rducksassy)"
+r-package: r-bootstrap
 	R CMD build r/Rducksassy
 r-readme:
 	Rscript -e 'rmarkdown::render("r/Rducksassy/README.Rmd", quiet = TRUE)'
