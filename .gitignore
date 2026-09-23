@@ -1,4 +1,8 @@
 /build/
+/site/
+/cmake_build/
+/configure/
+/.venv/
 /rust/target/
 /.deps/
 /.deps-v1/

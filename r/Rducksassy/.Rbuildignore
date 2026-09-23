@@ -1,7 +1,11 @@
 ^DESCRIPTION[.]in$
+^_pkgdown[.]yml$
 ^README[.]Rmd$
 ^cran-comments[.]md$
 ^src/ducksassy[.]duckdb_extension$
 ^src/build$
 ^src/extension/rust/target$
 ^src/extension/build$
+^bootstrap[.]R$
+^tools/sources[.]tsv$
+^tools/patches$

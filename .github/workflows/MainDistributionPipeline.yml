@@ -1,0 +1,71 @@
+name: Extension distribution (DuckDB v1.5.5)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simd-contract-arm64:
+    name: ARM64 NEON contracts
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - name: Build and run C and Rust tests with NEON selected
+        env:
+          SASSY_C_BACKEND: neon
+        run: |
+          make test-v2
+          RUSTFLAGS='-Ctarget-feature=+neon' cargo --config build/rust-vendor.toml test --frozen \
+            --manifest-path rust/Cargo.toml --no-default-features --features backend-neon -j2
+  sanitizers:
+    name: V1 C adapter ASan and LSan (without DuckHTS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Stage released host and SDK
+        run: |
+          python3 tools/fetch_v1_sdk.py configure/sdk-v1
+          version=$(jq -r .v1_host.duckdb_version ducksassy-package.json)
+          mkdir -p configure/cli
+          curl -fL --retry 3 "https://github.com/duckdb/duckdb/releases/download/${version}/duckdb_cli-linux-amd64.zip" -o configure/cli.zip
+          unzip configure/cli.zip -d configure/cli
+      - name: Instrument C adapter and core
+        run: |
+          cmake -S . -B build/asan -DDUCKSASSY_HOST=v1 -DDUCKDB_CAPI_DIR="$PWD/configure/sdk-v1" \
+            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS='-fsanitize=address -fno-omit-frame-pointer' \
+            -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address
+          cmake --build build/asan -j2
+      - name: Native ABI and load lifetime checks
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          DUCKDB_ASAN_CLI: ${{ github.workspace }}/configure/cli/duckdb
+        run: |
+          # LSan cannot inspect threads under QEMU/ptrace; native tests retain leak checks.
+          ctest --test-dir build/asan --output-on-failure -E qemu
+          python3 test/native_load.py --host v1 --duckdb tools/duckdb-asan \
+            --extension build/asan/ducksassy.duckdb_extension
+  distribution:
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.5
+    with:
+      extension_name: ducksassy
+      duckdb_version: v1.5.5
+      ci_tools_version: v1.5.5
+      extra_toolchains: rust;python3
+      reduced_ci_mode: disabled
+      # Windows lacks CMake archive/link/metadata support. Wasm's Rust backend
+      # is type-checked separately but has no complete extension build here.
+      exclude_archs: 'windows_amd64;windows_amd64_mingw;windows_amd64_rtools;windows_arm64;wasm_mvp;wasm_eh;wasm_threads'
