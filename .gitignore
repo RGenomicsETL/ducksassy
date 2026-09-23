@@ -20,3 +20,5 @@ __pycache__/
 /r/Rducksassy/src/ducksassy.duckdb_extension
 /r/Rducksassy/src/extension/rust/target/
 /*.Rcheck/
+# Untracked checkout of the RGenomicsETL/community-extensions fork.
+/community-extensions/

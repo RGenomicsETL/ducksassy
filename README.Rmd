@@ -99,7 +99,8 @@ SELECT * FROM sassy_backend_info();
 ```
 
 Download the CLI separately as described in
-[host architecture, setup and measurements](docs/v1-host.md).
+[host architecture, setup and measurements](docs/v1-host.md). Every v1 function,
+with signatures and examples, is listed in the [function reference](docs/functions.md).
 V1 `LOAD` writes no catalog entries and works on a read-only database.
 Scalars use positional trailing options: `alphabet, rc, all_endpoints,
 cigar_format` for matches, and `pam_length, allow_pam_edits, max_n_frac, rc`

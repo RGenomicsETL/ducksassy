@@ -1,5 +1,11 @@
 # ducksassy 0.1.0-dev
 
+- Document every released-host function in `functions.yaml`, rendered by
+  `make function_catalog` into `docs/functions.md` and, following DuckHTS, into
+  the DuckDB community extension descriptor. `make sql-test-v1` runs every
+  catalogued example and the hello world against the v1 artifact and fails when
+  the catalog and the registered functions differ.
+
 - `rducksassy_load()` refuses DuckDB engines other than the pinned C API v2
   preview builds with an `rducksassy_incompatible_host` error instead of
   crashing R; `options(Rducksassy.allow_untested_host = TRUE)` overrides it.
