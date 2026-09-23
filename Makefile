@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all help setup setup-data sdk sdk-v1 vendor-rust r-bootstrap r-bootstrap-check r-package r-readme site configure-v2 release-v2 release-v1 test-v2 sql-test sql-test-v1 oracle-test r-test readme benchmarks clean windows-host-check
+.PHONY: all help setup setup-data sdk sdk-v1 vendor-rust r-bootstrap r-bootstrap-check r-package r-readme site function_catalog configure-v2 release-v2 release-v1 test-v2 sql-test sql-test-v1 oracle-test r-test readme benchmarks clean windows-host-check
 BUILD_DIR ?= build
 MINGW_CC ?= x86_64-w64-mingw32-gcc
 DUCKDB_CAPI_DIR ?= $(CURDIR)/duckdb_capi
@@ -47,7 +47,7 @@ test_debug: test_extension_debug
 
 all: release
 help:
-	@printf '%s\n' 'Distribution v1: configure release debug test_release test_debug (build/release or build/debug)' 'Preview v2: configure-v2 release-v2 test-v2 sql-test r-test oracle-test readme (build/)' 'Local v1: sdk-v1 release-v1 sql-test-v1 (build-v1/)' 'R package: r-bootstrap r-bootstrap-check r-package; documentation: site (site/)'
+	@printf '%s\n' 'Distribution v1: configure release debug test_release test_debug (build/release or build/debug)' 'Preview v2: configure-v2 release-v2 test-v2 sql-test r-test oracle-test readme (build/)' 'Local v1: sdk-v1 release-v1 sql-test-v1 (build-v1/)' 'R package: r-bootstrap r-bootstrap-check r-package; documentation: site (site/), function_catalog'
 setup:
 	git submodule update --init
 	python3 tools/fetch_sdk.py $(DUCKDB_CAPI_DIR)
@@ -68,6 +68,12 @@ release-v1:
 sql-test-v1: release-v1
 	python3 test/run_sql.py --host v1 --duckdb $(V1_DUCKDB) --extension $(V1_BUILD_DIR)/ducksassy.duckdb_extension --duckhts $(V1_DUCKHTS)
 	python3 test/native_load.py --host v1 --duckdb $(V1_DUCKDB) --extension $(V1_BUILD_DIR)/ducksassy.duckdb_extension
+	python3 test/check_function_catalog.py --duckdb $(V1_DUCKDB) --extension $(V1_BUILD_DIR)/ducksassy.duckdb_extension
+# Renders docs/functions.md and, when ./community-extensions is a checkout of the
+# fork, extensions/ducksassy/description.yml for the community submission.
+function_catalog:
+	python3 scripts/render_function_catalog.py
+	python3 test/check_function_catalog.py
 vendor-rust:
 	Rscript tools/vendor-rust.R
 r-bootstrap:

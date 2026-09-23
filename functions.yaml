@@ -1,0 +1,165 @@
+{
+  "manifest_version": 1,
+  "community_extension": {
+    "extension": {
+      "name": "ducksassy",
+      "description": "Approximate DNA, IUPAC and ASCII string matching with SIMD Sassy kernels, including CRISPR guide search",
+      "language": "C & Rust",
+      "build": "cmake",
+      "license": "GPL-2.0-or-later",
+      "requires_toolchains": "rust;python3",
+      "excluded_platforms": "windows_amd64;windows_amd64_mingw;windows_amd64_rtools;windows_arm64;wasm_mvp;wasm_eh;wasm_threads",
+      "maintainers": [
+        "sounkou-bioinfo"
+      ]
+    },
+    "repo": {
+      "github": "RGenomicsETL/ducksassy",
+      "ref_source": "git_head"
+    },
+    "docs": {
+      "hello_world_lines": [
+        "-- Load the extension",
+        "LOAD ducksassy;",
+        "",
+        "-- Find a DNA pattern with up to one edit, on both strands",
+        "SELECT unnest(sassy_matches('ACGTAGG', 'TTACGTTGGAA', 1), recursive := true);",
+        "",
+        "-- Fuzzy grep over text: one allowed edit, ASCII alphabet",
+        "SELECT * FROM sassy_grep('timeout', 'request timedout; retry timeout', 1);",
+        "",
+        "-- CRISPR guide with its NGG PAM against a sequence column",
+        "SELECT name, unnest(sassy_crispr_matches('ACGTNGG', seq, 1), recursive := true)",
+        "FROM (VALUES ('target', 'TTACGTAGGTT')) AS t(name, seq);"
+      ],
+      "extended_intro": [
+        "Ducksassy brings [Sassy](https://github.com/RagnarGrootKoerkamp/sassy), a SIMD approximate string matcher by Rick Beeloo and Ragnar Groot Koerkamp, into DuckDB. Search DNA, IUPAC or ASCII text for patterns with up to k substitutions, insertions or deletions, and get every hit back as rows with edit cost, zero-based half-open coordinates, strand and CIGAR.",
+        "Scalar functions search any sequence or text column, so pattern panels, guide libraries and targets compose with joins, filters and aggregates. CRISPR search applies Sassy's exact PAM endpoint filter and N-content limit. Packed BAM-style CIGAR operations are available in SAM forward-reference order.",
+        "Pair it with the [duckhts](https://duckdb.org/community_extensions/extensions/duckhts) community extension to search FASTA, FASTQ and BAM records directly."
+      ],
+      "feature_notes": [
+        "Scalar arguments are positional with trailing defaults; the C extension API does not support named scalar arguments. For example `sassy_matches(pattern, text, k, alphabet := 'iupac', rc := true, all_endpoints := false, cigar_format := 'text')` is written `sassy_matches(pattern, text, k, 'iupac', true, false, 'text')`, and trailing arguments may be omitted.",
+        "Every scalar has VARCHAR and BLOB overloads; pattern and text must use the same type. `_many` variants take a `VARCHAR[]` or `BLOB[]` panel and report the zero-based `pattern_idx` of each hit.",
+        "Coordinates are zero-based and half-open in the input text. Text CIGAR is in pattern direction on reverse-strand hits; packed `cigar_ops` use BAM encoding in forward-reference order with query soft clips.",
+        "`sassy_grep` streams one long ASCII value in overlapping 1 KiB regions and returns all qualifying endpoints, so an outer `LIMIT` stops the search early.",
+        "The SIMD backend (scalar, AVX2, AVX-512 or NEON) is chosen at runtime; set `SASSY_C_BACKEND` before the first search to force one. `sassy_backend_info()` reports what is compiled, supported and selected.",
+        "Loading executes no SQL and writes nothing to the database, so read-only databases are supported. Windows and WebAssembly builds are not yet provided."
+      ]
+    }
+  },
+  "functions": [
+    {
+      "name": "sassy_matches",
+      "kind": "scalar",
+      "category": "Search",
+      "signature": "sassy_matches(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false[, cigar_format := 'text']]]])",
+      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]",
+      "description": "Return every approximate match of one pattern in a text with at most k edits. `alphabet` is 'dna', 'iupac' or 'ascii'; `rc` also searches the reverse complement; `all_endpoints` reports every qualifying endpoint instead of Sassy's rightmost local minima; `cigar_format` is 'text', 'packed' or 'both'.",
+      "examples": [
+        "SELECT unnest(sassy_matches('ACGTAGG', 'TTACGTTGGAA', 1), recursive := true);",
+        "SELECT unnest(sassy_matches('error', 'errot: disk full', 1, 'ascii', false), recursive := true);",
+        "SELECT hit.text_start, hit.cigar, hit.cigar_ops\nFROM (SELECT unnest(sassy_matches('ACGTAGG', 'TTACGTTGGAA', 1, 'dna', false, false, 'both')) AS hit);"
+      ]
+    },
+    {
+      "name": "sassy_matches_many",
+      "kind": "scalar",
+      "category": "Search",
+      "signature": "sassy_matches_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false[, cigar_format := 'text']]]])",
+      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]",
+      "description": "Search a panel of up to 4096 patterns in one text. Each hit carries the zero-based `pattern_idx` of the panel entry that produced it, so duplicate patterns stay distinct.",
+      "examples": [
+        "SELECT hit.pattern_idx, hit.text_start\nFROM (SELECT unnest(sassy_matches_many(['ACGT', 'TTGC'], 'ACGTTTGCACGT', 0, 'dna', false)) AS hit);"
+      ]
+    },
+    {
+      "name": "sassy_count",
+      "kind": "scalar",
+      "category": "Search",
+      "signature": "sassy_count(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "returns": "UBIGINT",
+      "description": "Count the matches `sassy_matches` would return, without building CIGAR strings.",
+      "examples": [
+        "SELECT sassy_count('ACGT', 'ACGTNNACGT', 0, 'iupac', false);"
+      ]
+    },
+    {
+      "name": "sassy_count_many",
+      "kind": "scalar",
+      "category": "Search",
+      "signature": "sassy_count_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "returns": "UBIGINT",
+      "description": "Count the matches of every pattern in a panel, without building CIGAR strings.",
+      "examples": [
+        "SELECT sassy_count_many(['ACGT', 'TTGC'], 'ACGTTTGCACGT', 0, 'dna', false);"
+      ]
+    },
+    {
+      "name": "sassy_contains",
+      "kind": "scalar",
+      "category": "Search",
+      "signature": "sassy_contains(pattern, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "returns": "BOOLEAN",
+      "description": "Return whether the text contains at least one match of the pattern with at most k edits.",
+      "examples": [
+        "SELECT sassy_contains('ACGT', 'TTACGTT', 0), sassy_contains('ACGT', 'TTTT', 0);"
+      ]
+    },
+    {
+      "name": "sassy_contains_many",
+      "kind": "scalar",
+      "category": "Search",
+      "signature": "sassy_contains_many(patterns, text, k[, alphabet := 'iupac'[, rc := true[, all_endpoints := false]]])",
+      "returns": "BOOLEAN",
+      "description": "Return whether any pattern in the panel matches the text with at most k edits.",
+      "examples": [
+        "SELECT sassy_contains_many(['ACGT', 'GGGG'], 'TTACGT', 0, 'dna', false);"
+      ]
+    },
+    {
+      "name": "sassy_grep",
+      "kind": "table",
+      "category": "Search",
+      "signature": "sassy_grep(pattern VARCHAR, text VARCHAR, k BIGINT)",
+      "returns": "TABLE(text_start UBIGINT, text_end UBIGINT, cost INTEGER, cigar VARCHAR)",
+      "description": "Stream the matches of an ASCII pattern in one long text value, scanning overlapping 1 KiB regions and returning all qualifying endpoints. An outer `LIMIT` stops the scan once enough rows are produced.",
+      "examples": [
+        "SELECT * FROM sassy_grep('timeout', 'request timedout; retry timeout', 1);",
+        "SELECT text_start FROM sassy_grep('error', 'error: ' || repeat('ready ', 100000), 1) LIMIT 1;"
+      ]
+    },
+    {
+      "name": "sassy_crispr_matches",
+      "kind": "scalar",
+      "category": "CRISPR",
+      "signature": "sassy_crispr_matches(guide, text, k[, pam_length := 3[, allow_pam_edits := false[, max_n_frac := 0.2[, rc := true]]]])",
+      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]",
+      "description": "Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default.",
+      "examples": [
+        "SELECT unnest(sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 1), recursive := true);"
+      ]
+    },
+    {
+      "name": "sassy_crispr_matches_many",
+      "kind": "scalar",
+      "category": "CRISPR",
+      "signature": "sassy_crispr_matches_many(guides, text, k[, pam_length := 3[, allow_pam_edits := false[, max_n_frac := 0.2[, rc := true]]]])",
+      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]",
+      "description": "Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls.",
+      "examples": [
+        "SELECT hit.pattern_idx, hit.text_start, hit.strand\nFROM (SELECT unnest(sassy_crispr_matches_many(['ACGTNGG', 'TTTTNGG'], 'TTACGTAGGTT', 0)) AS hit);"
+      ]
+    },
+    {
+      "name": "sassy_backend_info",
+      "kind": "table",
+      "category": "Diagnostics",
+      "signature": "sassy_backend_info()",
+      "returns": "TABLE(name VARCHAR, compiled BOOLEAN, supported BOOLEAN, selected BOOLEAN)",
+      "description": "Report each SIMD backend (scalar, avx2, avx512, neon, wasm128): whether it is compiled into this build, supported by the running CPU, and selected. Selection happens on the first search.",
+      "examples": [
+        "SELECT * FROM sassy_backend_info();"
+      ]
+    }
+  ]
+}
