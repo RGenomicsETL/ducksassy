@@ -15,10 +15,17 @@
   manifest (`tools/sources.tsv`), with package-only changes kept as patches in
   `tools/patches/`. `make r-bootstrap-check` fails CI when committed copies drift.
 
-- Distribute the stable v1 extension through DuckDB's Linux and macOS matrix,
-  with native sqllogictests, ARM64 NEON contracts and C adapter ASan/LSan checks.
-  Preview development uses `release-v2` and `test-v2`; distribution owns
-  `configure`, `release`, `debug`, `test_release` and `test_debug`.
+- Distribute the stable v1 extension through DuckDB's Linux, macOS and Windows
+  x86-64 MinGW/Rtools matrix, with native sqllogictests, ARM64 NEON contracts and
+  C adapter ASan/LSan checks. Windows links static Rust/GCC runtimes, exports only
+  the C API entry point and uses catalog-owned Win32 worker state. Preview
+  development uses `release-v2` and `test-v2`; distribution owns `configure`,
+  `release`, `debug`, `test_release` and `test_debug`.
+- Build scalar MVP/EH Wasm side modules and verify their SQL catalog and examples
+  in DuckDB-Wasm 1.5.5. They remain excluded from distribution: Rust 1.91's
+  prebuilt Emscripten std cannot recover panics in these bundles. Threaded Wasm
+  also fails the shared-memory link because prebuilt std lacks atomics. Browser
+  panic-ABI probes enforce those exclusions; the project uses stable Rust.
 - Check the staged Rducksassy source package on Linux and macOS against the v2
   preview R host. Rduckhts supplies runtime extension files via `Suggests`.
 - Publish R reference, evaluated README and benchmark reports with pkgdown and
@@ -51,8 +58,8 @@
 - Add `sassy_grep(pattern, text, k)` as an incremental ASCII table scan. SQL
   `LIMIT` can stop searches after an output batch. Scalar searches borrow
   vector strings and materialize one complete result per input value.
-- Add a build-time wasm128 backend for Emscripten targets. The Rust wasm target
-  is typechecked in CI; a linked DuckDB-Wasm extension needs platform validation.
+- Use scalar kernels for Emscripten MVP/EH and reserve wasm128 for threaded
+  Emscripten builds. The Rust target is typechecked in CI.
 
 - Use Sassy 0.2.6, including its native CRISPR N-content filtering. Public C ABI and SQL signatures are unchanged.
 
