@@ -45,6 +45,19 @@ writeLines(notices, file.path(package, "inst", "LICENCE.note"))
 stopifnot(file.copy(file.path(package, "DESCRIPTION.in"),
                     file.path(package, "DESCRIPTION"), overwrite = TRUE))
 
+# The C API v2 preview is not ABI-stable across engine commits. Record the
+# engines whose headers match the bundled SDK: the pinned SDK/CLI engine and the
+# pinned R host engine. rducksassy_load() refuses other hosts.
+pins <- readLines(file.path(repo_root, "ducksassy-package.json"), warn = FALSE)
+pin <- function(key) {
+  value <- sub(sprintf('.*"%s": *"([0-9a-f]{40})".*', key), "\\1",
+               grep(sprintf('"%s"', key), pins, value = TRUE))
+  if (length(value) != 1L || nchar(value) != 40L) stop("Missing pin ", key, call. = FALSE)
+  substr(value, 1L, 10L)
+}
+writeLines(c(pin("duckdb_sdk_revision"), pin("engine_revision")),
+           file.path(package, "inst", "host_revisions"))
+
 patches <- sort(list.files(file.path(package, "tools", "patches"),
                            pattern = "[.]patch$", full.names = TRUE))
 for (patch in patches) {

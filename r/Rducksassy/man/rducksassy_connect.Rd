@@ -31,8 +31,12 @@ Automatic extension downloads are disabled.
 \examples{
 if (requireNamespace("duckdb.2.0.dev", quietly = TRUE) &&
     nzchar(system.file(package = "Rduckhts"))) {
-  con <- rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
-  DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
-  DBI::dbDisconnect(con, shutdown = TRUE)
+  # Returns NULL on a preview engine this build does not support.
+  con <- tryCatch(rducksassy_connect(driver = duckdb.2.0.dev::duckdb),
+                  rducksassy_incompatible_host = function(e) NULL)
+  if (!is.null(con)) {
+    print(DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)"))
+    DBI::dbDisconnect(con, shutdown = TRUE)
+  }
 }
 }

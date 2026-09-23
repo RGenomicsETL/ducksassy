@@ -9,6 +9,8 @@ permissions:
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.os }}
+    # The first run compiles the pinned duckdb.2.0.dev from source.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -17,6 +19,9 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # Search tests must run against the pinned host, not skip.
+      RDUCKSASSY_REQUIRE_HOST: 'true'
+      MAKEFLAGS: -j4
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,13 +36,19 @@ jobs:
           extra-repositories: https://duckdb.r-universe.dev https://rgenomicsetl.r-universe.dev
       - name: Bootstrap package sources and reject drift from committed copies
         run: make r-bootstrap-check
+      # r-universe only serves the newest preview build, whose C API v2 function
+      # table can differ from the bundled headers (loading it segfaults). Install
+      # the pinned duckdb-r revision instead; the dependency cache keys on it.
+      - name: Read the pinned preview host
+        id: host
+        run: echo "revision=$(jq -r .r_integration_host.revision ducksassy-package.json)" >> "$GITHUB_OUTPUT"
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           working-directory: r/Rducksassy
           extra-packages: |
             any::rcmdcheck
             any::jsonlite
-            any::duckdb.2.0.dev
+            github::duckdb/duckdb-r@${{ steps.host.outputs.revision }}
             any::Rduckhts
           needs: check
       - name: Build source tarball and unpack check input
