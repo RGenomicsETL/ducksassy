@@ -28,8 +28,17 @@ CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_SYSTEM_PROCESSOR=arm64
 endif
 CMAKE_EXTRA_BUILD_FLAGS += -DCMAKE_SYSTEM_NAME=Darwin -DRUST_TARGET=$(OSX_RUST_TARGET)
 endif
-include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
-include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
+# Include the CI makefiles only once the submodule exists, so a fresh clone can
+# still run `make setup`, which initializes it.
+CI_TOOLS_MAKEFILES := extension-ci-tools/makefiles/c_api_extensions
+ifneq ($(wildcard $(CI_TOOLS_MAKEFILES)/base.Makefile),)
+include $(CI_TOOLS_MAKEFILES)/base.Makefile
+include $(CI_TOOLS_MAKEFILES)/c_cpp.Makefile
+else
+venv platform extension_version build_extension_with_metadata_release build_extension_with_metadata_debug test_extension_release test_extension_debug:
+	@echo "extension-ci-tools is missing; run make setup or git submodule update --init" >&2
+	@exit 1
+endif
 
 .PHONY: configure release debug test_release test_debug distribution-sdk rust-target
 configure: venv platform extension_version distribution-sdk
