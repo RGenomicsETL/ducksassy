@@ -128,9 +128,52 @@ mkdir -p .deps-v1/cli
 curl -fL --retry 3 https://github.com/duckdb/duckdb/releases/download/v1.5.5/duckdb_cli-linux-amd64.zip -o .deps-v1/cli.zip
 unzip .deps-v1/cli.zip -d .deps-v1/cli
 make release-v1 sql-test-v1
-make release test sql-test oracle-test r-test readme
+make release-v2 test-v2 sql-test oracle-test r-test readme
 make windows-host-check  # requires x86_64-w64-mingw32-gcc
 ```
+
+### Distribution and CI
+
+The released-host distribution contract uses DuckDB **v1.5.5** and stable
+C API **v1.2.0** metadata. `extension-ci-tools` is pinned to
+`72e76e99cd7fee45a99739cd118ec2db64e034ec` from its `v1.5.5` branch;
+the upstream repository publishes version branches, not tags. The reusable
+workflow uses that same `v1.5.5` ref for both workflow and CI tools.
+
+```sh
+git submodule update --init
+make configure
+make release test_release
+make debug test_debug
+```
+
+`configure` downloads checksum-verified headers to `configure/sdk-v1` and sets
+up the upstream Python test environment. These targets use
+`base.Makefile` and `c_cpp.Makefile`; CMake builds the Rust static archives, so
+the Rust-only makefile is not included. Builds use `cmake_build/{release,debug}`
+and produce `build/{release,debug}/ducksassy.duckdb_extension` plus the nested
+`extension/ducksassy/` copies expected by distribution CI. Install `ccache`, or
+pass `CMAKE_FLAGS=-DCMAKE_C_COMPILER_LAUNCHER=` to build without its launcher.
+The local v1 targets above use `build-v1/`; v2 uses `configure-v2`, `release-v2`
+and `test-v2` in `build/`. R packages bundle the v2 adapter.
+
+`MainDistributionPipeline.yml` enables the full upstream Linux x86-64/ARM64
+and macOS x86-64/ARM64 matrix (`reduced_ci_mode: disabled`). Windows is excluded
+because CMake lacks its archive/link/metadata implementation. Wasm is excluded
+because the Rust backend is only cross-type-checked, not linked into a tested
+extension. Native v1 sqllogictests cover the public symbols, scalar defaults,
+BLOB/VARCHAR, NULL/empty inputs, text/packed CIGAR, CRISPR, backend inspection,
+relation composition and grep. Separate jobs run ARM64 NEON C/Rust contracts
+and native-only ASan/LSan checks. LSan excludes QEMU tests because its thread
+inspection does not work under ptrace; unsanitized CTest retains QEMU coverage.
+DuckHTS is not loaded by the sanitizer job, and Rust archives are not instrumented.
+
+`cran-check.yml` builds a self-contained R source tarball and checks its unpacked
+contents with `r-lib/actions/check-r-package` on Linux and macOS, using R release
+and the `duckdb.2.0.dev` preview package. A Linux job also runs `make r-test`.
+The exact preview engine revision remains checked by that integration test.
+Windows is outside the package's `OS_type: unix` support. R-devel/source-built
+DuckDB compatibility is outside this binary-oriented matrix.
 
 `test/native_load.py` checks native catalog types, repeated `LOAD`, fresh file
 close/reopen, read-only primary loading, unchanged database bytes and worker
@@ -153,13 +196,12 @@ the v2 macro collision probe; upstream CRISPR agrees across 36 profiles and 864
 guide/record comparisons. Nine SQL families pass through the R/DBI preview
 (`bcff503658`), and README rendering succeeds. ASan/LSan on the v1 C adapter/core
 passes native-only read-only/load/close/reopen tests without a leak report.
-The Rust archive is not sanitizer-instrumented. The source R package builds
-and passes `R CMD check --no-manual` with one NOTE:
-
-```text
-Namespace in Imports field not imported from: ‘Rduckhts’
-  All declared Imports should be used.
-```
+The source R package builds and passes `R CMD check --no-manual` with
+`Status: OK`. `--as-cran` has no errors or warnings; its incoming-feasibility
+NOTE covers the development version, preview repository and Pages URL (404
+until first deployment). `Rduckhts` is a suggested runtime dependency: the
+connection helpers require its installed extension files but do not import
+its R namespace. Examples explicitly select the v2 preview driver.
 
 The full sanitizer suite with the existing DuckHTS binary reports:
 
@@ -174,7 +216,7 @@ SUMMARY: AddressSanitizer: 2503 byte(s) leaked in 16 allocation(s).
 A process loading only DuckHTS reproduces that report
 (`.deps-v1/duckhts-only-lsan.log`). The combined SQL suite passes address checks
 with leak detection disabled; this does not establish dependency leak freedom.
-The shared dependency is outside this change's write scope.
+The dependency's leak behavior must be assessed separately.
 
 Tree-sitter anti-slop parses `src/ducksassy_core.c` with zero findings, but the
 full `src` scan cannot analyze the extension entrypoint macros and dispatcher
@@ -185,6 +227,23 @@ ERROR parse-error: Tree-sitter could not parse this source exactly; anti-slop di
 ```
 
 This is a linter coverage limitation, not a clean whole-tree lint result.
+
+### Documentation site
+
+`make site` runs `tools/build-site.R`. pkgdown builds the R reference under
+`site/reference/`; litedown renders the committed evaluated `README.md`, all
+`benchmarks/*.md` reports and this host guide. The site build does not execute
+README code or benchmarks. It maps report links to HTML, source/evidence links
+to GitHub, and verifies local pages, assets and fragments with
+`tools/check-site.R`. Generated HTML stays under ignored `site/`, separate from
+source Markdown in `docs/`.
+
+`pages.yml` builds and deploys through GitHub's Pages artifact actions on a
+push to `main` or manual dispatch. Set **Settings → Pages → Build and deployment
+→ Source: GitHub Actions** and allow the `github-pages` environment to deploy
+from `main`. The public URL is <https://rgenomicsetl.github.io/ducksassy/>.
+Linux local validation is not evidence that the remote multi-platform matrix
+or Pages deployment has run; those require an owner-authorized push.
 
 ## Measurements
 
@@ -227,8 +286,8 @@ are not evidence of scalable parallel work for the single-record FASTA scan.
 
 ## Community submission
 
-Before publication: run the released-host platform matrix (especially Windows
-CMake/link support, loading, concurrent workers and close/reopen), build distribution archives,
+Before publication: run the supported released-host platform matrix, including
+loading, concurrent workers and close/reopen, and build distribution archives,
 validate signatures/metadata and licensing against community-extension
 requirements, and decide the v1 artifact/version naming. Keep v2/R preview
 compatibility separate. Publishing or opening a submission requires explicit

@@ -23,14 +23,16 @@ support. It receives \code{dbdir}, \code{read_only} and \code{config}.}
 A DBI connection. Close it with \code{DBI::dbDisconnect(con, shutdown = TRUE)}.
 }
 \description{
-Requires a DuckDB host with C API v2 support.
+Requires a DuckDB host with C API v2 support and the suggested
+\code{Rduckhts} package for its installed extension files.
 The connection allows loading the extensions built by the R packages.
 Automatic extension downloads are disabled.
 }
 \examples{
-\donttest{
-con <- rducksassy_connect()
-DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
-DBI::dbDisconnect(con, shutdown = TRUE)
+if (requireNamespace("duckdb.2.0.dev", quietly = TRUE) &&
+    nzchar(system.file(package = "Rduckhts"))) {
+  con <- rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
+  DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
+  DBI::dbDisconnect(con, shutdown = TRUE)
 }
 }

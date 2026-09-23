@@ -18,6 +18,10 @@ knitr::opts_chunk$set(
 
 # ducksassy
 
+[![Distribution CI](https://github.com/RGenomicsETL/ducksassy/actions/workflows/MainDistributionPipeline.yml/badge.svg)](https://github.com/RGenomicsETL/ducksassy/actions/workflows/MainDistributionPipeline.yml)
+[![R CMD check](https://github.com/RGenomicsETL/ducksassy/actions/workflows/cran-check.yml/badge.svg)](https://github.com/RGenomicsETL/ducksassy/actions/workflows/cran-check.yml)
+[Documentation](https://rgenomicsetl.github.io/ducksassy/)
+
 Approximate string matching inside DuckDB.
 
 [DuckHTS](https://github.com/RGenomicsETL/duckhts) exposes FASTA and FASTQ records
@@ -114,7 +118,9 @@ CROSS JOIN LATERAL unnest(
 
 Use `read_fastq(...)` for reads, `_many` with a pattern list for panels, or
 `sassy_crispr_matches(guide, r.sequence, k)` for CRISPR. The v1 build uses
-`DUCKSASSY_HOST=v1`; the default is `v2`. Keep their build directories separate.
+`DUCKSASSY_HOST=v1`; standalone CMake defaults to `v2`. Keep their build directories separate.
+Distribution CI uses `make configure release test_release`, which produces the
+v1 artifact under `build/release/`; see the [CI contract](docs/v1-host.md#distribution-and-ci).
 
 ### Pinned C API v2 host
 
@@ -124,7 +130,7 @@ compilers, CMake ≥ 3.20, Python ≥ 3.11, Git, R ≥ 4.1 and rustup.
 
 ```sh
 make setup JOBS=4
-make release
+make release-v2
 .deps/duckdb-build/duckdb -unsigned -no-init
 ```
 
@@ -155,7 +161,7 @@ Its examples include searching BAM read sequences while retaining alignment
 identifiers for SQL joins and summaries.
 
 ```r
-install.packages("Rducksassy", repos = c(
+install.packages(c("Rducksassy", "Rduckhts"), repos = c(
   "https://rgenomicsetl.r-universe.dev",
   "https://duckdb.r-universe.dev",
   "https://cloud.r-project.org"
@@ -465,7 +471,7 @@ limits; [test/c/test_abi.c](test/c/test_abi.c) is a working example.
 ## Development
 
 ```sh
-make test sql-test oracle-test readme
+make test-v2 sql-test oracle-test readme
 ```
 
 `oracle-test` compares complete CRISPR hit multisets against the Sassy

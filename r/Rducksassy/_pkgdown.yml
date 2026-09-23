@@ -1,0 +1,35 @@
+url: https://rgenomicsetl.github.io/ducksassy/
+destination: ../../site
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+  bslib:
+    primary: '#17675c'
+    link-color: '#17675c'
+
+development:
+  mode: unreleased
+
+home:
+  title: Approximate text and sequence search in DuckDB
+
+navbar:
+  structure:
+    left: [reference, benchmarks, host]
+    right: [search, github]
+  components:
+    benchmarks:
+      text: Benchmarks
+      href: benchmarks/index.html
+    host:
+      text: Released DuckDB host
+      href: docs/v1-host.html
+
+reference:
+  - title: Open a connection
+    contents:
+      - rducksassy_connect
+  - title: Load into an existing connection
+    contents:
+      - rducksassy_load

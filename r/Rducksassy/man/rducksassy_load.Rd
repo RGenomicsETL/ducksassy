@@ -15,4 +15,6 @@ Invisibly, the supplied connection.
 \description{
 Loads the package-built DuckHTS and Ducksassy extensions into an existing
 DuckDB connection. The host must support C API v2 and permit unsigned extensions.
+Install the suggested \code{Rduckhts} package to supply its extension files;
+its R namespace is not loaded.
 }

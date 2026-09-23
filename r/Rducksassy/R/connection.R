@@ -1,6 +1,7 @@
 #' Open a DuckDB connection with Ducksassy and DuckHTS
 #'
-#' Requires a DuckDB host with C API v2 support.
+#' Requires a DuckDB host with C API v2 support and the suggested
+#' \code{Rduckhts} package for its installed extension files.
 #' The connection allows loading the extensions built by the R packages.
 #' Automatic extension downloads are disabled.
 #'
@@ -12,10 +13,11 @@
 #' @return A DBI connection. Close it with \code{DBI::dbDisconnect(con, shutdown = TRUE)}.
 #' @export
 #' @examples
-#' \donttest{
-#' con <- rducksassy_connect()
-#' DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
-#' DBI::dbDisconnect(con, shutdown = TRUE)
+#' if (requireNamespace("duckdb.2.0.dev", quietly = TRUE) &&
+#'     nzchar(system.file(package = "Rduckhts"))) {
+#'   con <- rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
+#'   DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
+#'   DBI::dbDisconnect(con, shutdown = TRUE)
 #' }
 rducksassy_connect <- function(dbdir = ":memory:", read_only = FALSE,
                               driver = getOption("Rducksassy.driver")) {
@@ -41,6 +43,8 @@ rducksassy_connect <- function(dbdir = ":memory:", read_only = FALSE,
 #'
 #' Loads the package-built DuckHTS and Ducksassy extensions into an existing
 #' DuckDB connection. The host must support C API v2 and permit unsigned extensions.
+#' Install the suggested \code{Rduckhts} package to supply its extension files;
+#' its R namespace is not loaded.
 #'
 #' @param con An existing DuckDB DBI connection with C API v2 support.
 #' @return Invisibly, the supplied connection.
@@ -48,7 +52,10 @@ rducksassy_connect <- function(dbdir = ":memory:", read_only = FALSE,
 rducksassy_load <- function(con) {
   # Load the packaged native extension without importing a second DBI driver.
   duckhts <- system.file("duckhts_extension", "build", "duckhts.duckdb_extension",
-                         package = "Rduckhts", mustWork = TRUE)
+                         package = "Rduckhts")
+  if (!nzchar(duckhts)) {
+    stop("Install Rduckhts to supply the DuckHTS extension required by this helper.", call. = FALSE)
+  }
   extension <- system.file("libs", .Platform$r_arch, "ducksassy.duckdb_extension",
                            package = "Rducksassy", mustWork = TRUE)
   tryCatch(

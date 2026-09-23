@@ -1,5 +1,14 @@
 # ducksassy 0.1.0-dev
 
+- Distribute the stable v1 extension through DuckDB's Linux and macOS matrix,
+  with native sqllogictests, ARM64 NEON contracts and C adapter ASan/LSan checks.
+  Preview development uses `release-v2` and `test-v2`; distribution owns
+  `configure`, `release`, `debug`, `test_release` and `test_debug`.
+- Check the staged Rducksassy source package on Linux and macOS against the v2
+  preview R host. Rduckhts supplies runtime extension files via `Suggests`.
+- Publish R reference, evaluated README and benchmark reports with pkgdown and
+  litedown at <https://rgenomicsetl.github.io/ducksassy/>.
+
 - Add `cigar_format := 'packed'` and `'both'` to `sassy_matches` and
   `sassy_matches_many` for SAM-oriented BAM `UINTEGER[]` operations. Text CIGAR
   remains in pattern direction; packed-only calls do not build text CIGAR.

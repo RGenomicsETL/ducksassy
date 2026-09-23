@@ -10,7 +10,7 @@ filter them and summarize them in the same query.
 ## Install
 
 ``` r
-install.packages("Rducksassy", repos = c(
+install.packages(c("Rducksassy", "Rduckhts"), repos = c(
   "https://rgenomicsetl.r-universe.dev",
   "https://duckdb.r-universe.dev",
   "https://cloud.r-project.org"
@@ -18,6 +18,8 @@ install.packages("Rducksassy", repos = c(
 ```
 
 Loading the extension requires a **DuckDB host with C API v2 support**.
+The connection helpers also require the suggested `Rduckhts` package for its
+installed extension files; they do not load its R namespace.
 The package builds against bundled headers and does not link to a particular
 R DuckDB driver. `rducksassy_load(con)` accepts an existing compatible DBI
 connection; `rducksassy_connect()` uses `duckdb::duckdb` by default and also
