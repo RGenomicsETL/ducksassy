@@ -1,5 +1,9 @@
 # ducksassy 0.1.0-dev
 
+- Add `sassy_matches_packed`, `sassy_matches_many_packed` and `*_both` for
+  SAM-oriented BAM `UINTEGER[]` operations. Text CIGAR remains in pattern
+  direction; packed-only calls do not build text CIGAR.
+
 - Reuse hit and CIGAR buffers per searcher and keep successful error bookkeeping
   allocation-free. C callers can return consumed results with
   `sassy_c_result_recycle()`; outstanding owned results keep independent lifetimes.
