@@ -1,6 +1,10 @@
 /build/
 /rust/target/
 /.deps/
+/.deps-v1/
+/build-v1/
+/build-v2/
+/build-baseline/
 /.pi/
 /artifacts/
 /benchmarks/data/*/*.log

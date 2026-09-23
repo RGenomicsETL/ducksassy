@@ -8,6 +8,14 @@
   "duckdb_c_api_major": 2,
   "allow_unstable_symbols": false,
   "duckdb_sdk_revision": "fece4143738e2b1d05a851d5c5dc036838aff8ec",
+  "v1_host": {
+    "duckdb_version": "v1.5.5",
+    "extension_api_version": "v1.2.0",
+    "sdk_sha256": {
+      "duckdb.h": "48e716b9ce96ca8fead9cb35693fdc0343ac0fc1f6e7db5561fa0f44b674153d",
+      "duckdb_extension.h": "a932d6f328c3700dc9dc90ab16a1fd9f76950ea2a1d4cc555cdd33990a7e3dd3"
+    }
+  },
   "r_integration_host": {
     "package": "duckdb.2.0.dev",
     "revision": "191e68535c1f89c7c8fac370a49b54e4d8127bbf",

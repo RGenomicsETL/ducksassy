@@ -5,7 +5,8 @@ package <- file.path(root, "r", "Rducksassy")
 extension <- file.path(package, "src", "extension")
 files <- c(
   "CMakeLists.txt", "rust/Cargo.toml", "rust/Cargo.lock", "rust/src/lib.rs",
-  "include/sassy_c.h", "src/ducksassy.c", "src/sassy_backend.h", "src/sassy_dispatch.c",
+  "include/sassy_c.h", "src/ducksassy_core.c", "src/ducksassy_core.h", "src/host_v2.c",
+  "src/sassy_backend.h", "src/sassy_dispatch.c",
   "duckdb_capi/duckdb_v2.h", "duckdb_capi/duckdb_extension_v2.h", "duckdb_capi/REVISION",
   "third_party/rust/vendor.tar.xz",
   "extension-ci-tools/scripts/append_extension_metadata.py"

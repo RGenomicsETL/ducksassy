@@ -1,4 +1,4 @@
-name: C API v2 and Rust C library
+name: C API hosts and Rust C library
 on:
   pull_request:
   push:
@@ -52,6 +52,36 @@ jobs:
             include/sassy_c.h
             rust/Cargo.lock
             sql/ducksassy.sql
+  released-v1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - name: Stage released stable v1 SDK and CLI
+        run: |
+          make sdk-v1
+          version=$(jq -r .v1_host.duckdb_version ducksassy-package.json)
+          curl -fL --retry 3 "https://github.com/duckdb/duckdb/releases/download/${version}/duckdb_cli-linux-amd64.zip" -o .deps-v1/cli.zip
+          unzip .deps-v1/cli.zip -d .deps-v1/cli
+          .deps-v1/cli/duckdb --version
+      - name: Build stable v1 adapter and test native ABI
+        run: |
+          make release-v1
+          ctest --test-dir build-v1 --output-on-failure
+          nm -D build-v1/ducksassy.so | grep ' T ducksassy_init_c_api$'
+          if nm -D --undefined-only build-v1/ducksassy.so | grep -E ' U duckdb_'; then exit 1; fi
+          if ldd build-v1/ducksassy.so | grep -i duckdb; then exit 1; fi
+      - name: Stage checksum-pinned DuckHTS and test offline SQL
+        run: |
+          python3 tools/stage_runtime.py duckhts
+          make sql-test-v1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ducksassy-v1-linux-amd64
+          path: build-v1/ducksassy.duckdb_extension
   sql-integration:
     runs-on: ubuntu-24.04
     timeout-minutes: 60

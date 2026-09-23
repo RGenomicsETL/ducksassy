@@ -4,6 +4,11 @@
   `sassy_matches_many` for SAM-oriented BAM `UINTEGER[]` operations. Text CIGAR
   remains in pattern direction; packed-only calls do not build text CIGAR.
   All formats return a struct with nullable `cigar` and `cigar_ops` fields.
+- Build a stable C API v1.2.0 adapter for released DuckDB v1.5.5 with
+  `DUCKSASSY_HOST=v1`. `LOAD` registers native value functions and streaming
+  grep without DDL or DuckHTS. Scalar arguments are positional; relation and
+  file searches use lateral joins. The v2 named-argument macros are unchanged.
+  The adapters share validation, batching, packed output and streaming grep.
 
 - Reuse hit and CIGAR buffers per searcher and keep successful error bookkeeping
   allocation-free. C callers can return consumed results with

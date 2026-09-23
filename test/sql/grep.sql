@@ -18,6 +18,10 @@ SELECT CASE WHEN count(*) = 0 THEN true
             ELSE error('sassy_grep differs from whole-value search') END
 FROM differences;
 
+SELECT CASE WHEN count(*) = 1 AND min(text_start) = 1 AND min(text_end) = 4
+    THEN true ELSE error('sassy_grep embedded NUL bytes') END
+FROM sassy_grep('a' || chr(0) || 'b', 'xa' || chr(0) || 'by', 0);
+
 -- A long flat run exercises many overlapping windows and repeated endpoints.
 WITH expected AS (
     SELECT hit.text_start AS text_start, hit.text_end AS text_end,

@@ -71,7 +71,31 @@ whole-human-genome throughput or peak memory use.
 
 ## Quick start
 
-ducksassy targets the DuckDB C API v2 preview (DuckDB 1.x cannot load it).
+### Released DuckDB v1 host
+
+DuckDB v1.5.5 can load the stable v1.2.0 C API artifact without DuckHTS or
+an external SQL bootstrap:
+
+``` sh
+make sdk-v1 release-v1
+.deps-v1/cli/duckdb -unsigned -no-init
+```
+
+``` sql
+LOAD 'build-v1/ducksassy.duckdb_extension';
+SELECT sassy_count('ACGT', 'TTACGT', 0, rc := false);
+SELECT * FROM sassy_grep('error', 'error: disk full', 0);
+```
+
+Download the CLI separately as described in
+[host architecture, setup and measurements](docs/v1-host.md).
+File helpers require an explicit local `LOAD` of DuckHTS; value and
+named-relation searches do not. The v1 build uses `DUCKSASSY_HOST=v1`;
+the default is `v2`. Use separate build directories for the two artifacts.
+
+### Pinned C API v2 host
+
+The v2 artifact targets the DuckDB C API v2 preview.
 `make setup` fetches the matching CLI and checks the bundled SDK. On Linux x86-64 you need C/C++
 compilers, CMake ≥ 3.20, Python ≥ 3.11, Git, R ≥ 4.1 and rustup.
 
@@ -91,7 +115,7 @@ INSTALL 'build/ducksassy.duckdb_extension';
 ```
 
 The lambda setting is required by DuckHTS 1.5.2 and applies to the whole
-database instance, so use a dedicated one. The macros are connection-scoped.
+database instance, so use a dedicated one. The v2 bootstrap macros are connection-scoped; v1 installs database-scoped macros.
 Supported host versions are pinned in
 [ducksassy-package.json](ducksassy-package.json). When upgrading, move an
 outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
