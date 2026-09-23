@@ -22,6 +22,10 @@ FROM sassy_search_fasta('test/data/references.fasta', 'ACGTAGG', 0,
                         alphabet := 'iupac', rc := false) actual
 JOIN read_fasta('test/data/references.fasta', scan_mode := 'sequential') original USING (name)
 WHERE name = 'masked';
+SELECT CASE WHEN count(*) = 3 AND bool_and(hit.cigar IS NULL AND hit.cigar_ops IS NOT NULL)
+            THEN true ELSE error('FASTA cigar_format pass-through') END
+FROM sassy_search_fasta('test/data/references.fasta', 'ACGTAGG', 0,
+                        alphabet := 'iupac', rc := false, cigar_format := 'packed');
 SELECT CASE WHEN count(*) = 4 AND count(*) FILTER (WHERE hit.pattern_idx = 1 AND name = 'reverse') = 1
             THEN true ELSE error('FASTA panel indices') END
 FROM sassy_panel_search_fasta('test/data/references.fasta', ['ACGTAGG', 'CCTACGT'], 0,

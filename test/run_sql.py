@@ -53,6 +53,7 @@ def main():
             ("SELECT sassy_matches('ACGA', 'ACGA', -1);", 'nonnegative'),
             ("SELECT sassy_matches('ACGA', 'NNNN', 0, alphabet := 'dna');", 'invalid sequence alphabet'),
             ("SELECT sassy_matches_many(['ACGA', NULL], 'ACGA', 0);", 'NULL elements'),
+            ("SELECT sassy_matches('ACGA', 'ACGA', 0, cigar_format := 'legacy');", 'text, packed, or both'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, pam_length := 0);", 'pam_length'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, pam_length := 8);", 'PAM length'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, max_n_frac := -0.1);", 'max_n_frac'),

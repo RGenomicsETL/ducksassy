@@ -1,4 +1,5 @@
 //! Native Sassy search engines and owned results behind the C backend table.
+use pa_types::CigarOp;
 use sassy::profiles::{Ascii, Dna, Iupac, Profile};
 use sassy::{Match, Searcher, Strand};
 use std::cell::RefCell;
@@ -6,7 +7,9 @@ use std::ffi::{c_char, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::{ptr, slice};
 
-const BACKEND_TABLE_VERSION: u32 = 1;
+const BACKEND_TABLE_VERSION: u32 = 2;
+const PACKED_CIGAR: u32 = 1;
+const MAX_BAM_RUN: u32 = (1 << 28) - 1;
 const MAX_PATTERNS: usize = 4096;
 const MAX_PATTERN_BYTES: usize = 4096;
 const INVALID: i32 = 1;
@@ -59,6 +62,13 @@ pub struct SassyHit {
     pub cigar_length: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct SassyOpSpan {
+    pub offset: u64,
+    pub length: u64,
+}
+
 enum Engine {
     Ascii(Searcher<Ascii>),
     Dna(Searcher<Dna>),
@@ -76,6 +86,8 @@ pub struct SassySearcher {
 pub struct SassyResult {
     hits: Vec<SassyHit>,
     cigars: Vec<u8>,
+    op_spans: Vec<SassyOpSpan>,
+    ops: Vec<u32>,
 }
 
 #[repr(C)]
@@ -120,6 +132,12 @@ pub struct SassyCBackendTable {
     ) -> i32,
     pub result_free: unsafe extern "C" fn(*mut SassyResult),
     pub result_recycle: unsafe extern "C" fn(*mut SassySearcher, *mut SassyResult),
+    pub result_ops_view: unsafe extern "C" fn(
+        *const SassyResult,
+        *mut *const SassyOpSpan,
+        *mut *const u32,
+        *mut usize,
+    ) -> i32,
 }
 
 fn invalid(message: &str) -> Error {
@@ -169,7 +187,7 @@ fn validate_alphabet(seq: &[u8], alphabet: u32) -> Result<(), Error> {
 
 fn validate_options(opts: &SassyOptions) -> Result<(), Error> {
     if opts.struct_size as usize != std::mem::size_of::<SassyOptions>()
-        || opts.reserved != 0
+        || opts.reserved & !PACKED_CIGAR != 0
         || opts.all_endpoints > 1
         || opts.include_cigar > 1
     {
@@ -222,13 +240,54 @@ fn append_matches(
     result: &mut SassyResult,
     matches: Vec<Match>,
     pattern_idx: usize,
+    pattern_len: usize,
     opts: &SassyOptions,
 ) -> Result<(), Error> {
     result
         .hits
         .try_reserve(matches.len())
         .map_err(|_| (LIMIT, "could not reserve hit output".to_owned()))?;
+    if opts.reserved & PACKED_CIGAR != 0 {
+        result.op_spans.try_reserve(matches.len())
+            .map_err(|_| (LIMIT, "could not reserve operation spans".to_owned()))?;
+    }
     for m in matches {
+        let op_offset = result.ops.len();
+        if opts.reserved & PACKED_CIGAR != 0 {
+            // Sassy stores RC operations in pattern order; SAM orders them along
+            // the forward reference. Query clips flank the aligned pattern segment.
+            let (left, right) = if m.strand == Strand::Rc {
+                (pattern_len - m.pattern_end, m.pattern_start)
+            } else {
+                (m.pattern_start, pattern_len - m.pattern_end)
+            };
+            let mut push_op = |len: usize, code: u32| -> Result<(), Error> {
+                if len == 0 {
+                    return Ok(());
+                }
+                let len = u32::try_from(len).map_err(|_| (LIMIT, "CIGAR run too long".to_owned()))?;
+                if len > MAX_BAM_RUN {
+                    return Err((LIMIT, "CIGAR run exceeds BAM 28-bit limit".to_owned()));
+                }
+                result.ops.try_reserve(1).map_err(|_| (LIMIT, "could not reserve packed CIGAR".to_owned()))?;
+                result.ops.push((len << 4) | code);
+                Ok(())
+            };
+            push_op(left, 4)?;
+            let ops = &m.cigar.ops;
+            for i in 0..ops.len() {
+                let element = &ops[if m.strand == Strand::Rc { ops.len() - 1 - i } else { i }];
+                let code = match element.op {
+                    CigarOp::Match => 7,
+                    CigarOp::Sub => 8,
+                    CigarOp::Ins => 1,
+                    CigarOp::Del => 2,
+                };
+                push_op(element.cnt as usize, code)?;
+            }
+            push_op(right, 4)?;
+            result.op_spans.push(SassyOpSpan { offset: op_offset as u64, length: (result.ops.len() - op_offset) as u64 });
+        }
         let offset = result.cigars.len();
         if opts.include_cigar != 0 {
             let cigar = m.cigar.to_string();
@@ -346,7 +405,8 @@ unsafe extern "C" fn sassy_c_search_many(
                 let pattern = unsafe { bytes(*p)? };
                 // An unwinding kernel must not leave a reusable, apparently healthy searcher.
                 state.poisoned = true;
-                let matches = match &mut state.engine {
+                let engine = &mut state.engine;
+                let matches = match engine {
                     Engine::Ascii(s) => {
                         if opts.all_endpoints != 0 {
                             s.search_all(pattern, text, k as usize)
@@ -370,7 +430,7 @@ unsafe extern "C" fn sassy_c_search_many(
                     }
                 };
                 state.poisoned = false;
-                append_matches(&mut result, matches, i, opts)?;
+                append_matches(&mut result, matches, i, pattern.len(), opts)?;
             }
         }
         unsafe {
@@ -480,7 +540,7 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
             };
             state.poisoned = false;
             engine.set_max_n_frac(1.0);
-            append_matches(&mut result, matches, index, &common)?;
+            append_matches(&mut result, matches, index, guide.len(), &common)?;
         }
         unsafe {
             *out = Box::into_raw(result);
@@ -527,6 +587,32 @@ unsafe extern "C" fn sassy_c_result_view(
 }
 
 /// # Safety
+/// All pointers must obey the result view ownership rules.
+unsafe extern "C" fn sassy_c_result_ops_view(
+    result: *const SassyResult,
+    spans: *mut *const SassyOpSpan,
+    ops: *mut *const u32,
+    count: *mut usize,
+) -> i32 {
+    guard(|| {
+        if spans.is_null() || ops.is_null() || count.is_null() {
+            return Err(invalid("operation view output slot is NULL"));
+        }
+        unsafe { *spans = ptr::null(); *ops = ptr::null(); *count = 0; }
+        if result.is_null() {
+            return Err(invalid("result is NULL"));
+        }
+        let r = unsafe { &*result };
+        unsafe {
+            if !r.op_spans.is_empty() { *spans = r.op_spans.as_ptr(); }
+            if !r.ops.is_empty() { *ops = r.ops.as_ptr(); }
+            *count = r.ops.len();
+        }
+        Ok(())
+    })
+}
+
+/// # Safety
 /// `result` must be NULL or an owned pointer returned by this library. Free exactly once.
 unsafe extern "C" fn sassy_c_result_free(result: *mut SassyResult) {
     if !result.is_null() {
@@ -551,6 +637,8 @@ unsafe extern "C" fn sassy_c_result_recycle(
     let mut result = unsafe { Box::from_raw(result) };
     result.hits.clear();
     result.cigars.clear();
+    result.op_spans.clear();
+    result.ops.clear();
     unsafe { (*searcher).spare_result = Some(result) };
 }
 
@@ -566,6 +654,7 @@ static BACKEND_TABLE: SassyCBackendTable = SassyCBackendTable {
     result_view: sassy_c_result_view,
     result_free: sassy_c_result_free,
     result_recycle: sassy_c_result_recycle,
+    result_ops_view: sassy_c_result_ops_view,
 };
 
 #[cfg(feature = "backend-scalar")]
@@ -840,6 +929,94 @@ mod tests {
             sassy_c_searcher_free(searcher);
         }
         snapshot
+    }
+    #[test]
+    fn alignment_axes_and_reverse_order() {
+        let mut forward = sassy::Searcher::<sassy::profiles::Dna>::new_fwd();
+        let mut reverse = sassy::Searcher::<sassy::profiles::Dna>::new_rc();
+        let pattern = b"ACGTTGCA";
+        for (text, expected) in [
+            (b"GGACGTTGCACC".as_slice(), "8="),
+            (b"GGACGTTTGCACC", "3=1D5="),
+            (b"GGACGTGCACC", "3=1I4="),
+        ] {
+            let hit = &forward.search(pattern, text, 1)[0];
+            assert_eq!(hit.cigar.to_string(), expected);
+            assert_eq!(hit.text_start, 2);
+        }
+        for (text, expected) in [
+            (b"GGTGCAACGTCC".as_slice(), "8="),
+            (b"GGTGCAAACGTCC", "3=1D5="),
+            (b"GGTGCACGTCC", "3=1I4="),
+        ] {
+            let hit = reverse.search(pattern, text, 1).into_iter()
+                .find(|hit| hit.strand == Strand::Rc).unwrap();
+            assert_eq!(hit.cigar.to_string(), expected);
+            assert_eq!(hit.text_start, 2);
+            assert_eq!(hit.pattern_start, 0);
+        }
+    }
+    fn aligned_text_from_packed(ops: &[u32], reverse: bool) -> String {
+        let mut pairs: Vec<_> = ops.iter().filter_map(|&word| {
+            let code = word & 15;
+            if code == 4 {
+                return None;
+            }
+            Some((word >> 4, match code {
+                1 => 'I', 2 => 'D', 7 => '=', 8 => 'X', _ => panic!("unexpected BAM opcode"),
+            }))
+        }).collect();
+        if reverse { pairs.reverse(); }
+        pairs.iter().map(|(length, code)| format!("{length}{code}")).collect()
+    }
+
+    #[test]
+    fn packed_views_and_clips() {
+        let mut searcher = sassy::Searcher::<sassy::profiles::Iupac>::new_fwd();
+        let mut partial = searcher.search(b"ATCG", b"ATCG", 0).remove(0);
+        partial.pattern_start = 2;
+        partial.pattern_end = 6;
+        let opts = SassyOptions { struct_size: std::mem::size_of::<SassyOptions>() as u32,
+            all_endpoints: 0, include_cigar: 0, reserved: PACKED_CIGAR };
+        let mut result = SassyResult::default();
+        append_matches(&mut result, vec![partial], 0, 10, &opts).unwrap();
+        assert_eq!(result.ops, vec![(2 << 4) | 4, (4 << 4) | 7, (4 << 4) | 4]);
+        assert_eq!(aligned_text_from_packed(&result.ops, false), "4=");
+        assert!(result.cigars.is_empty());
+        result.ops.clear();
+        result.op_spans.clear();
+        let mut rc_partial = sassy::Searcher::<sassy::profiles::Iupac>::new_rc();
+        let mut reverse_partial = rc_partial.search(b"ATCG", b"CGAT", 0).into_iter()
+            .find(|hit| hit.strand == Strand::Rc).unwrap();
+        reverse_partial.pattern_start = 2;
+        reverse_partial.pattern_end = 6;
+        append_matches(&mut result, vec![reverse_partial], 0, 10, &opts).unwrap();
+        assert_eq!(result.ops, vec![(4 << 4) | 4, (4 << 4) | 7, (2 << 4) | 4]);
+        assert_eq!(aligned_text_from_packed(&result.ops, true), "4=");
+        result.ops.clear();
+        result.op_spans.clear();
+        let mut rc = sassy::Searcher::<sassy::profiles::Dna>::new_rc();
+        let hit = rc.search(b"ACGTTGCA", b"GGTGCAAACGTCC", 1).into_iter()
+            .find(|hit| hit.strand == Strand::Rc).unwrap();
+        append_matches(&mut result, vec![hit], 0, 8, &opts).unwrap();
+        assert_eq!(result.ops, vec![(5 << 4) | 7, (1 << 4) | 2, (3 << 4) | 7]);
+        assert_eq!(aligned_text_from_packed(&result.ops, true), "3=1D5=");
+        assert!(result.cigars.is_empty());
+        let mut spans = ptr::null();
+        let mut ops = ptr::null();
+        let mut count = 0;
+        assert_eq!(unsafe { sassy_c_result_ops_view(&result, &mut spans, &mut ops, &mut count) }, 0);
+        assert_eq!(count, 3);
+        let mut forward = sassy::Searcher::<sassy::profiles::Dna>::new_fwd();
+        let substitution = forward.search(b"ACGA", b"TCGA", 1).into_iter()
+            .find(|hit| hit.cigar.to_string() == "1X3=").unwrap();
+        result.ops.clear();
+        result.op_spans.clear();
+        append_matches(&mut result, vec![substitution], 0, 4, &opts).unwrap();
+        assert_eq!(result.ops, vec![(1 << 4) | 8, (3 << 4) | 7]);
+        assert_eq!(aligned_text_from_packed(&result.ops, false), "1X3=");
+        let bad = SassyOptions { reserved: PACKED_CIGAR | 2, ..opts };
+        assert!(validate_options(&bad).is_err());
     }
     #[test]
     fn exact_and_panel_ids() {

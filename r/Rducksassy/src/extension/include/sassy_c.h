@@ -14,6 +14,7 @@ extern "C" {
 #define SASSY_C_ASCII 0U
 #define SASSY_C_DNA 1U
 #define SASSY_C_IUPAC 2U
+#define SASSY_C_PACKED_CIGAR 1U /* options.reserved bit: request packed ops */
 
 typedef struct sassy_c_searcher sassy_c_searcher;
 typedef struct sassy_c_result sassy_c_result;
@@ -47,6 +48,9 @@ typedef struct {
     uint64_t cigar_offset, cigar_length;
 } sassy_c_hit;
 typedef struct {
+    uint64_t offset, length; /* indices into the uint32_t operation slab */
+} sassy_c_op_span;
+typedef struct {
     uint32_t struct_size;
     sassy_c_backend backend;
     uint32_t compiled;
@@ -54,14 +58,22 @@ typedef struct {
     uint32_t selected;
 } sassy_c_backend_status;
 
-/* ABI 1: sizeof(options)=16, sizeof(hit)=64. Initialize reserved=0 and
- * struct_size=sizeof(sassy_c_options). Flags are 0/1, not ABI-dependent enums.
+/* ABI 1: sizeof(options)=16, sizeof(hit)=64. Set struct_size=sizeof(sassy_c_options).
+ * reserved is a bit set: only SASSY_C_PACKED_CIGAR is defined; other bits
+ * are rejected. all_endpoints and include_cigar are 0/1, not ABI-dependent enums.
  * DNA/IUPAC inputs accept either case; ASCII uses literal bytes <128 (NUL allowed).
  * Empty texts/panels produce an empty result. Empty/NULL panel elements error.
  * Patterns contain 1..4096 bytes, panels <=4096 patterns, k < every pattern length.
  * All text coordinates are zero-based, half-open in the original text.
- * strand 0=forward, 1=RC; RC CIGAR is in pattern direction, NOT SAM direction.
- * A result owns one hit array and one CIGAR byte slab. Strings are not terminated.
+ * strand 0=forward, 1=RC; text CIGAR is in pattern direction on RC hits.
+ * Packed ops use BAM uint32 encoding (run << 4 | op), query=pattern,
+ * reference=text, POS=text_start (zero-based), in forward-reference SAM order.
+ * RC reverses the Sassy operation order without exchanging I and D. Codes:
+ * I=1 (pattern only), D=2 (text only), S=4, ==7, X=8. No M is emitted.
+ * Partial pattern coverage is soft-clipped at the query ends; on RC hits the
+ * clips are reversed with the operation list. Runs over 2^28-1 return LIMIT.
+ * A result owns one hit array, a CIGAR byte slab and optional operation spans
+ * (one per hit) with a uint32 slab. Strings are not terminated.
  * No matched-sequence copies. Inputs are borrowed only during synchronous calls.
  * Searchers must never be used concurrently. Separate searchers may run in parallel.
  * A SASSY_C_PANIC poisons that searcher; free and recreate it before another search.
@@ -101,6 +113,11 @@ int32_t sassy_c_crispr_search_many(sassy_c_searcher *searcher, const sassy_c_sli
                                    const sassy_c_crispr_options *options, sassy_c_result **out);
 int32_t sassy_c_result_view(const sassy_c_result *result, const sassy_c_hit **hits, size_t *count,
                             const uint8_t **cigars, size_t *cigar_bytes);
+/* On results without packed ops, spans=NULL, ops=NULL and count=0.
+ * On packed results, spans has one entry per hit; count is the slab length.
+ * All views are valid until result free or recycle. */
+int32_t sassy_c_result_ops_view(const sassy_c_result *result, const sassy_c_op_span **spans,
+                                const uint32_t **ops, size_t *count);
 void sassy_c_result_free(sassy_c_result *result);
 /* Consume an owned result and retain its buffers for the searcher's next call.
  * All views of this result become invalid. searcher must be live and exclusively

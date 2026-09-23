@@ -289,9 +289,9 @@ SELECT sassy_contains('ACGA', 'TTACGATT', 0, rc := false) AS contains;
 SELECT unnest(sassy_matches('ACGA', 'TTACGATT', 0, rc := false), recursive := true);
 ```
 
-| pattern_idx | text_start | text_end | pattern_start | pattern_end | cost | strand | cigar |
-|------------:|-----------:|---------:|--------------:|------------:|-----:|--------|-------|
-|           0 |          2 |        6 |             0 |           4 |    0 | \+     | 4=    |
+| pattern_idx | text_start | text_end | pattern_start | pattern_end | cost | strand | cigar | cigar_ops |
+|------------:|-----------:|---------:|--------------:|------------:|-----:|--------|-------|-----------|
+|           0 |          2 |        6 |             0 |           4 |    0 | \+     | 4=    | NULL      |
 
 ## Function cheat sheet
 
@@ -310,6 +310,32 @@ pattern and text must use the same type. BLOBs hold plain sequence bytes, so
 decode DuckHTS nt16/nt4 packed symbols first. `sassy_count` and `sassy_contains`
 skip building CIGAR strings.
 
+### Packed CIGAR
+
+Set `cigar_format := 'packed'` on `sassy_matches` or `sassy_matches_many`
+for typed `cigar_ops UINTEGER[]` without formatting text CIGAR (`cigar` is
+NULL). Set `cigar_format := 'both'` for both representations. The default
+`'text'` returns text CIGAR and NULL `cigar_ops`. All formats share a fixed
+result struct with both nullable fields. Packed ops include soft clips for
+any partial pattern coverage returned by the search.
+
+``` sql
+SELECT hit.text_start, hit.cigar_ops
+FROM UNNEST(sassy_matches('ACGTTGCA', 'GGTGCAAACGTCC', 1,
+    alphabet := 'dna', cigar_format := 'packed')) AS matches(hit)
+WHERE hit.strand = '-';
+```
+
+When a DuckHTS build provides `cigar_aligned_blocks(cigar, pos)`, the typed
+result can be passed directly (this snippet is not an executed example):
+
+``` sql
+SELECT cigar_aligned_blocks(hit.cigar_ops, hit.text_start)
+FROM UNNEST(sassy_matches('ACGTTGCA', 'GGTGCAAACGTCC', 1,
+    alphabet := 'dna', cigar_format := 'packed')) AS matches(hit)
+WHERE hit.strand = '-';
+```
+
 ## The fine print
 
 <details>
@@ -319,7 +345,18 @@ skip building CIGAR strings.
 
 Matching uses Sassy 0.2.6. Coordinates are **zero-based, half-open**
 in the input text. `+` and `-` identify the pattern’s strand; reverse-strand
-CIGAR follows the pattern direction, not SAM direction.
+CIGAR follows the pattern direction, not SAM direction. Packed `cigar_ops`
+follow SAM’s forward-reference order: query = pattern, reference = text,
+POS = `text_start` (zero-based). A reverse hit reverses the structured Sassy
+operation list, retaining I (pattern-only) and D (text-only). The codes are
+BAM’s `I=1`, `D=2`, `S=4`, `=7`, `X=8`; Sassy emits explicit `=`/`X`, not `M`.
+Unaligned query ends are soft-clipped, with clips swapped on reverse hits;
+`pattern_start`/`pattern_end` describe the aligned segment in the original
+pattern. Excluding soft clips, the packed query span is
+`pattern_end - pattern_start`; its reference span is `text_end - text_start`.
+Each run is limited to the BAM 28-bit length field; larger runs fail with a
+limit error. Text CIGAR retains Sassy’s pattern-oriented notation without
+clips, including on reverse hits.
 
 General searches default to `alphabet := 'iupac'`, `rc := true` and
 `all_endpoints := false` (Sassy’s rightmost local minima). Set

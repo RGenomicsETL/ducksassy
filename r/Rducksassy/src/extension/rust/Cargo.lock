@@ -193,6 +193,7 @@ dependencies = [
 name = "sassy-c"
 version = "0.1.0"
 dependencies = [
+ "pa-types",
  "sassy",
 ]
 

@@ -159,7 +159,8 @@ static bool sassy_c_backend_table_valid(const sassy_c_backend_table *table) {
            table->struct_size == sizeof(*table) && table->last_error != NULL &&
            table->searcher_new != NULL && table->searcher_free != NULL && table->search != NULL &&
            table->search_many != NULL && table->crispr_search_many != NULL &&
-           table->result_view != NULL && table->result_free != NULL && table->result_recycle != NULL;
+           table->result_view != NULL && table->result_free != NULL && table->result_recycle != NULL &&
+           table->result_ops_view != NULL;
 }
 
 static bool sassy_c_backend_from_name(const char *name, sassy_c_backend *backend) {
@@ -365,6 +366,14 @@ int32_t sassy_c_result_view(const sassy_c_result *result, const sassy_c_hit **hi
     }
     sassy_c_clear_dispatch_error();
     return table->result_view(result, hits, count, cigars, cigar_bytes);
+}
+
+int32_t sassy_c_result_ops_view(const sassy_c_result *result, const sassy_c_op_span **spans,
+                                const uint32_t **ops, size_t *count) {
+    const sassy_c_backend_table *table = sassy_c_backend_for_call();
+    if (table == NULL) return SASSY_C_INVALID;
+    sassy_c_clear_dispatch_error();
+    return table->result_ops_view(result, spans, ops, count);
 }
 
 void sassy_c_result_free(sassy_c_result *result) {

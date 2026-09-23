@@ -11,6 +11,7 @@ name = "sassy_c"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
+pa-types = "=1.5.0"
 sassy = { version = "=0.2.6", default-features = false }
 
 [features]

@@ -7,7 +7,7 @@ import tomllib
 root = Path(__file__).resolve().parents[1]
 source = (root / "src/ducksassy.c").read_text()
 cargo = tomllib.loads((root / "rust/Cargo.toml").read_text())
-assert set(cargo["dependencies"]) == {"sassy"}
+assert set(cargo["dependencies"]) == {"sassy", "pa-types"}
 assert "staticlib" in cargo["lib"]["crate-type"]
 assert cargo["profile"]["release"]["panic"] == "unwind"
 assert '#include "duckdb_extension_v2.h"' in source
