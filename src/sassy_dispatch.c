@@ -1,6 +1,10 @@
 #include "sassy_backend.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#elif !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
 #include <pthread.h>
+#endif
 #include <stdbool.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -14,7 +18,13 @@
 
 #define SASSY_C_DISPATCH_ERROR_BYTES 256
 
+#ifdef _WIN32
+static INIT_ONCE sassy_c_selection_once = INIT_ONCE_STATIC_INIT;
+#elif defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+static bool sassy_c_selection_done;
+#else
 static pthread_once_t sassy_c_selection_once = PTHREAD_ONCE_INIT;
+#endif
 static const sassy_c_backend_table *sassy_c_selected_table;
 static _Atomic(sassy_c_backend) sassy_c_selected_backend = SASSY_C_BACKEND_COUNT;
 static char sassy_c_selection_error[SASSY_C_DISPATCH_ERROR_BYTES];
@@ -223,8 +233,27 @@ static void sassy_c_select_backend(void) {
     atomic_store_explicit(&sassy_c_selected_backend, backend, memory_order_release);
 }
 
+#ifdef _WIN32
+static BOOL CALLBACK sassy_c_select_backend_once(PINIT_ONCE once, PVOID parameter, PVOID *context) {
+    (void)once;
+    (void)parameter;
+    (void)context;
+    sassy_c_select_backend();
+    return TRUE;
+}
+#endif
+
 static const sassy_c_backend_table *sassy_c_backend_for_call(void) {
+#ifdef _WIN32
+    InitOnceExecuteOnce(&sassy_c_selection_once, sassy_c_select_backend_once, NULL, NULL);
+#elif defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+    if (!sassy_c_selection_done) {
+        sassy_c_select_backend();
+        sassy_c_selection_done = true;
+    }
+#else
     (void)pthread_once(&sassy_c_selection_once, sassy_c_select_backend);
+#endif
     if (sassy_c_selected_table == NULL) {
         sassy_c_set_dispatch_error(sassy_c_selection_error);
         return NULL;

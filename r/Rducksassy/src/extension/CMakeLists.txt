@@ -21,19 +21,26 @@ file(WRITE "${RUST_VENDOR_CONFIG}"
     "[source.crates-io]\nreplace-with = 'vendored-sources'\n[source.vendored-sources]\ndirectory = '${vendor_root}/vendor'\n")
 execute_process(COMMAND ${RUSTC} -vV OUTPUT_VARIABLE RUSTC_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
 string(REGEX MATCH "host: ([^\r\n]+)" _ "${RUSTC_VERSION}")
-set(RUST_TARGET "${CMAKE_MATCH_1}" CACHE STRING
-    "Rust target triple; Emscripten builds default to wasm32-unknown-emscripten")
-if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND RUST_TARGET STREQUAL "${CMAKE_MATCH_1}")
-    set(RUST_TARGET "wasm32-unknown-emscripten" CACHE STRING
-        "Rust target triple; Emscripten builds default to wasm32-unknown-emscripten" FORCE)
+set(RUST_TARGET_DEFAULT "${CMAKE_MATCH_1}")
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    set(RUST_TARGET_DEFAULT wasm32-unknown-emscripten)
+elseif(MINGW)
+    set(RUST_TARGET_DEFAULT x86_64-pc-windows-gnu)
 endif()
+set(RUST_TARGET "${RUST_TARGET_DEFAULT}" CACHE STRING "Rust target triple")
 if(NOT RUST_TARGET)
     message(FATAL_ERROR "Could not determine Rust target")
 endif()
 # extension-ci-tools sets CMAKE_SYSTEM_NAME=Darwin for macOS builds, which CMake
 # reports as cross compilation even on a native host.
-if(CMAKE_CROSSCOMPILING AND NOT CMAKE_SYSTEM_NAME MATCHES "^(Emscripten|Darwin)$")
-    message(FATAL_ERROR "Cross compilation is supported only for Emscripten wasm and macOS")
+if(WIN32 AND NOT MINGW)
+    message(FATAL_ERROR "Windows builds require MinGW or Rtools, not MSVC")
+endif()
+if(CMAKE_CROSSCOMPILING AND NOT MINGW AND NOT CMAKE_SYSTEM_NAME MATCHES "^(Emscripten|Darwin)$")
+    message(FATAL_ERROR "Cross compilation is supported only for MinGW, Emscripten wasm and macOS")
+endif()
+if(MINGW AND NOT RUST_TARGET STREQUAL "x86_64-pc-windows-gnu")
+    message(FATAL_ERROR "MinGW/Rtools builds require x86_64-pc-windows-gnu")
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND NOT RUST_TARGET MATCHES "^wasm32-")
     message(FATAL_ERROR "Emscripten builds require a wasm32 Rust target (got ${RUST_TARGET})")
@@ -42,20 +49,28 @@ string(TOUPPER "${RUST_TARGET}" RUST_TARGET_ENV_SUFFIX)
 string(REPLACE "-" "_" RUST_TARGET_ENV_SUFFIX "${RUST_TARGET_ENV_SUFFIX}")
 set(RUST_TARGET_RUSTFLAGS_ENV "CARGO_TARGET_${RUST_TARGET_ENV_SUFFIX}_RUSTFLAGS")
 set(RUST_TARGET_LINKER_ENV)
-if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    # Keep Rust's C ABI and standard library on the same Emscripten toolchain
-    # as the extension's final link.
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" OR MINGW)
     set(RUST_TARGET_LINKER_ENV "CARGO_TARGET_${RUST_TARGET_ENV_SUFFIX}_LINKER=${CMAKE_C_COMPILER}")
 endif()
+if(MINGW)
+    execute_process(COMMAND ${CMAKE_C_COMPILER} -print-file-name=libgcc_eh.a
+        OUTPUT_VARIABLE GCC_EH_LIBRARY OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+    if(GCC_EH_LIBRARY STREQUAL "libgcc_eh.a")
+        # Rtools42 folds the unwind runtime into libgcc. Rust also links Sassy's
+        # unused cdylib dependency and explicitly requests the split library.
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/rust-link")
+        file(WRITE "${CMAKE_BINARY_DIR}/rust-link/libgcc_eh.a" "INPUT(-lgcc)\n")
+        set(RUST_NATIVE_LINK_FLAGS "-Lnative=${CMAKE_BINARY_DIR}/rust-link")
+    endif()
+endif()
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
-find_package(Threads REQUIRED)
+if(NOT WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    find_package(Threads REQUIRED)
+endif()
 option(DUCKSASSY_DISTRIBUTION "Leave extension metadata to extension-ci-tools" OFF)
 set(DUCKSASSY_HOST "v2" CACHE STRING "DuckDB host adapter: v1 or v2")
 set_property(CACHE DUCKSASSY_HOST PROPERTY STRINGS v1 v2)
 if(DUCKSASSY_HOST STREQUAL "v1")
-    if(NOT UNIX OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-        message(FATAL_ERROR "The v1 host adapter requires native POSIX threads")
-    endif()
     set(DUCKDB_CAPI_DIR "${CMAKE_SOURCE_DIR}/.deps-v1/sdk" CACHE PATH "DuckDB C API headers")
     set(DUCKDB_HEADERS duckdb.h duckdb_extension.h)
     set(DUCKDB_ABI_VERSION v1.2.0)
@@ -79,9 +94,9 @@ set(SASSY_BACKEND_DEFINITIONS)
 function(add_sassy_backend NAME FEATURE RUST_FLAGS)
     set(backend_library "${CARGO_TARGET_DIR}/${NAME}/${RUST_TARGET}/release/libsassy_c.a")
     add_custom_command(OUTPUT "${backend_library}"
-        COMMAND ${CMAKE_COMMAND} -E env --unset=RUSTFLAGS --unset=CARGO_ENCODED_RUSTFLAGS
+        COMMAND ${CMAKE_COMMAND} -E env --unset=RUSTFLAGS --unset=CARGO_ENCODED_RUSTFLAGS --unset=EMCC_CFLAGS
             "CARGO_TARGET_DIR=${CARGO_TARGET_DIR}/${NAME}" "CARGO_PROFILE_RELEASE_LTO=false"
-            "${RUST_TARGET_RUSTFLAGS_ENV}=-C relocation-model=pic -C metadata=sassy_c_${NAME} ${RUST_FLAGS}"
+            "${RUST_TARGET_RUSTFLAGS_ENV}=-C relocation-model=pic -C metadata=sassy_c_${NAME} ${RUST_NATIVE_LINK_FLAGS} ${RUST_FLAGS}"
             ${RUST_TARGET_LINKER_ENV}
             ${CARGO} --config "${RUST_VENDOR_CONFIG}" build --release --frozen
             -j "${SASSY_CARGO_JOBS}" --no-default-features --features "${FEATURE}"
@@ -94,10 +109,23 @@ function(add_sassy_backend NAME FEATURE RUST_FLAGS)
 endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    # wasm SIMD is a module-level feature. Build one SIMD archive instead of
-    # runtime-dispatchable variants, and require the C side to emit SIMD too.
-    add_sassy_backend(wasm128 backend-wasm128 "-C target-feature=+simd128")
-    list(APPEND SASSY_BACKEND_DEFINITIONS SASSY_C_HAVE_SCALAR=0 SASSY_C_HAVE_WASM128=1)
+    if(NOT DUCKDB_PLATFORM MATCHES "^wasm_(mvp|eh|threads)$")
+        message(FATAL_ERROR "Set DUCKDB_PLATFORM to wasm_mvp, wasm_eh or wasm_threads")
+    endif()
+    set(CARGO_TARGET_DIR "${CARGO_TARGET_DIR}/${DUCKDB_PLATFORM}")
+    if(DUCKDB_PLATFORM STREQUAL "wasm_threads")
+        add_compile_options(-pthread -msimd128 -mbulk-memory -fwasm-exceptions)
+        add_sassy_backend(wasm128 backend-wasm128
+            "-C link-arg=--no-entry -C link-arg=-O1 -C target-feature=+simd128,+atomics,+bulk-memory")
+        list(APPEND SASSY_BACKEND_DEFINITIONS SASSY_C_HAVE_SCALAR=0 SASSY_C_HAVE_WASM128=1)
+    else()
+        # Rust 1.91's prebuilt std requires JS-based exception handling.
+        add_sassy_backend(scalar backend-scalar
+            "-C link-arg=--no-entry -C link-arg=-O1 -C target-feature=-simd128")
+        if(DUCKDB_PLATFORM STREQUAL "wasm_eh")
+            add_compile_options(-fwasm-exceptions)
+        endif()
+    endif()
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
     add_sassy_backend(scalar backend-scalar "")
     add_sassy_backend(avx2 backend-avx2 "-C target-feature=+avx2,+popcnt")
@@ -119,15 +147,12 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(sassy_dispatch PRIVATE -Wall -Wextra
         -Werror=implicit-function-declaration -Werror=incompatible-pointer-types)
 endif()
-if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    target_compile_options(sassy_dispatch PRIVATE -msimd128)
-endif()
 
 set(SASSY_C_LIBRARY "${CMAKE_BINARY_DIR}/libsassy_c.a")
 set(SASSY_COMBINE_SCRIPT "${CMAKE_BINARY_DIR}/combine_sassy_c.cmake")
 file(CONFIGURE OUTPUT "${SASSY_COMBINE_SCRIPT}" CONTENT [=[
 if(NOT DEFINED SASSY_C_OUTPUT OR NOT DEFINED SASSY_C_AR OR
-   NOT DEFINED SASSY_C_RANLIB OR NOT DEFINED SASSY_C_DISPATCH_OBJECT OR
+   NOT DEFINED SASSY_C_RANLIB OR
    NOT DEFINED SASSY_C_BACKEND_ARCHIVES)
     message(FATAL_ERROR "Missing Sassy archive-combination inputs")
 endif()
@@ -145,15 +170,24 @@ foreach(archive IN LISTS backend_archives)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "Could not extract ${archive}")
     endif()
-    file(GLOB objects "${archive_staging}/*.o")
+    file(GLOB objects "${archive_staging}/*.o" "${archive_staging}/*.obj")
     if(NOT objects)
         message(FATAL_ERROR "No object files found in ${archive}")
     endif()
     list(APPEND backend_objects ${objects})
 endforeach()
+if(DEFINED SASSY_C_DISPATCH_OBJECT)
+    list(PREPEND backend_objects "${SASSY_C_DISPATCH_OBJECT}")
+endif()
+# Response files also fit within Windows' command-line length limit.
+set(response "${staging}/objects.rsp")
+file(WRITE "${response}" "")
+foreach(object IN LISTS backend_objects)
+    file(APPEND "${response}" "\"${object}\"\n")
+endforeach()
 file(REMOVE "${SASSY_C_OUTPUT}")
 execute_process(COMMAND "${SASSY_C_AR}" qc "${SASSY_C_OUTPUT}"
-    "${SASSY_C_DISPATCH_OBJECT}" ${backend_objects} RESULT_VARIABLE status)
+    "@${response}" RESULT_VARIABLE status)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "Could not create ${SASSY_C_OUTPUT}")
 endif()
@@ -180,15 +214,29 @@ add_library(sassy_c STATIC IMPORTED GLOBAL)
 set_target_properties(sassy_c PROPERTIES IMPORTED_LOCATION "${SASSY_C_LIBRARY}")
 add_dependencies(sassy_c sassy_rust)
 
-set(NATIVE_LIBS Threads::Threads ${CMAKE_DL_LIBS})
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND NATIVE_LIBS m rt util)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    # Emscripten supplies the C/POSIX shims used by the dispatcher.
-elseif(NOT APPLE)
-    message(FATAL_ERROR "This initial build supports Linux, macOS, and Emscripten wasm.")
+    set(NATIVE_LIBS Threads::Threads ${CMAKE_DL_LIBS} m rt util)
+elseif(APPLE)
+    set(NATIVE_LIBS Threads::Threads ${CMAKE_DL_LIBS})
+elseif(MINGW)
+    # rustc 1.91 --print native-static-libs, with libgcc linked statically.
+    set(NATIVE_LIBS kernel32 ntdll userenv ws2_32 dbghelp)
+elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    message(FATAL_ERROR "Supported toolchains: Linux, macOS, MinGW/Rtools and Emscripten")
 endif()
-add_library(ducksassy SHARED src/ducksassy_core.c src/host_${DUCKSASSY_HOST}.c)
+if(DUCKDB_WASM_EXTENSION)
+    add_library(ducksassy STATIC src/ducksassy_core.c src/host_${DUCKSASSY_HOST}.c)
+    # extension-ci-tools links only libducksassy.a into the side module.
+    add_custom_command(TARGET ducksassy POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            "-DSASSY_C_OUTPUT=$<TARGET_FILE:ducksassy>"
+            "-DSASSY_C_AR=${CMAKE_AR}" "-DSASSY_C_RANLIB=${CMAKE_RANLIB}"
+            "-DSASSY_C_BACKEND_ARCHIVES=$<TARGET_FILE:ducksassy>|${SASSY_C_LIBRARY}"
+            -P "${SASSY_COMBINE_SCRIPT}"
+        VERBATIM)
+else()
+    add_library(ducksassy SHARED src/ducksassy_core.c src/host_${DUCKSASSY_HOST}.c)
+endif()
 target_compile_definitions(ducksassy PRIVATE DUCKDB_EXTENSION_NAME=ducksassy)
 target_include_directories(ducksassy PRIVATE include "${DUCKDB_CAPI_DIR}" "${CMAKE_BINARY_DIR}")
 target_link_libraries(ducksassy PRIVATE sassy_c ${NATIVE_LIBS})
@@ -201,13 +249,17 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(ducksassy PRIVATE -Wl,--exclude-libs,ALL)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    target_link_options(ducksassy PRIVATE -msimd128)
+elseif(MINGW)
+    # GCC's emulated TLS can pull in winpthreads even with Win32 synchronization.
+    target_link_options(ducksassy PRIVATE -static -static-libgcc -Wl,--exclude-all-symbols)
+    set_target_properties(ducksassy PROPERTIES PREFIX "lib")
 endif()
 if(NOT DUCKSASSY_DISTRIBUTION AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     set(DUCKDB_PLATFORM "" CACHE STRING "Exact PRAGMA platform value for the deployment host")
     if(NOT DUCKDB_PLATFORM)
-        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        if(MINGW)
+            set(DUCKDB_PLATFORM windows_amd64_mingw)
+        elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
                 set(DUCKDB_PLATFORM linux_amd64)
             elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
@@ -237,7 +289,7 @@ if(NOT DUCKSASSY_DISTRIBUTION AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
         VERBATIM)
 endif()
 include(CTest)
-if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING AND NOT WIN32)
     add_executable(test_c_abi test/c/test_abi.c)
     target_include_directories(test_c_abi PRIVATE include)
     target_link_libraries(test_c_abi PRIVATE sassy_c ${NATIVE_LIBS})

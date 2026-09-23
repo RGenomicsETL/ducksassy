@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ducksassy browser smoke test</title>
+<script type="module">
+import * as duckdb from '/duckdb-browser.mjs';
+window.startDucksassy = async (variant) => {
+    const bundle = { wasm_mvp: 'mvp', wasm_eh: 'eh', wasm_threads: 'coi' }[variant];
+    const worker = new Worker(`/dist/duckdb-browser-${bundle}.worker.js`);
+    const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+    await db.instantiate(`/dist/duckdb-${bundle}.wasm`,
+        bundle === 'coi' ? '/dist/duckdb-browser-coi.pthread.worker.js' : undefined);
+    await db.open({ allowUnsignedExtensions: true });
+    const conn = await db.connect();
+    window.sql = async (sql) => JSON.parse(JSON.stringify((await conn.query(sql)).toArray(),
+        (_, value) => typeof value === 'bigint' ? Number(value) : value));
+    window.closeDucksassy = async () => {
+        await conn.close(); await db.reset(); await db.terminate(); worker.terminate();
+    };
+    const version = await window.sql('PRAGMA version');
+    const platform = await window.sql('PRAGMA platform');
+    console.log('Host identity', JSON.stringify({ version, platform }));
+    await conn.query(`LOAD '${location.origin}/extensions/${variant}/ducksassy.duckdb_extension'`);
+    return { version, platform };
+};
+</script>
