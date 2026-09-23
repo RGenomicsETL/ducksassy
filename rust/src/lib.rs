@@ -9,7 +9,6 @@ use std::{ptr, slice};
 
 const BACKEND_TABLE_VERSION: u32 = 2;
 const PACKED_CIGAR: u32 = 1;
-const PARTIAL_OVERHANG: u32 = 2;
 const MAX_BAM_RUN: u32 = (1 << 28) - 1;
 const MAX_PATTERNS: usize = 4096;
 const MAX_PATTERN_BYTES: usize = 4096;
@@ -78,9 +77,7 @@ enum Engine {
 
 pub struct SassySearcher {
     engine: Engine,
-    partial_engine: Option<Engine>,
     alphabet: u32,
-    reverse_complement: bool,
     poisoned: bool,
     spare_result: Option<Box<SassyResult>>,
 }
@@ -190,7 +187,7 @@ fn validate_alphabet(seq: &[u8], alphabet: u32) -> Result<(), Error> {
 
 fn validate_options(opts: &SassyOptions) -> Result<(), Error> {
     if opts.struct_size as usize != std::mem::size_of::<SassyOptions>()
-        || opts.reserved & !(PACKED_CIGAR | PARTIAL_OVERHANG) != 0
+        || opts.reserved & !PACKED_CIGAR != 0
         || opts.all_endpoints > 1
         || opts.include_cigar > 1
     {
@@ -265,9 +262,13 @@ fn append_matches(
                 (m.pattern_start, pattern_len - m.pattern_end)
             };
             let mut push_op = |len: usize, code: u32| -> Result<(), Error> {
-                if len == 0 { return Ok(()); }
+                if len == 0 {
+                    return Ok(());
+                }
                 let len = u32::try_from(len).map_err(|_| (LIMIT, "CIGAR run too long".to_owned()))?;
-                if len > MAX_BAM_RUN { return Err((LIMIT, "CIGAR run exceeds BAM 28-bit limit".to_owned())); }
+                if len > MAX_BAM_RUN {
+                    return Err((LIMIT, "CIGAR run exceeds BAM 28-bit limit".to_owned()));
+                }
                 result.ops.try_reserve(1).map_err(|_| (LIMIT, "could not reserve packed CIGAR".to_owned()))?;
                 result.ops.push((len << 4) | code);
                 Ok(())
@@ -351,9 +352,7 @@ unsafe extern "C" fn sassy_c_searcher_new(
         unsafe {
             *out = Box::into_raw(Box::new(SassySearcher {
                 engine,
-                partial_engine: None,
                 alphabet,
-                reverse_complement: rc,
                 poisoned: false,
                 spare_result: None,
             }));
@@ -400,22 +399,13 @@ unsafe extern "C" fn sassy_c_search_many(
         let opts = unsafe { &*options };
         let (state, patterns, text) =
             unsafe { search_inputs(searcher, patterns, n_patterns, text, k, opts)? };
-        if opts.reserved & PARTIAL_OVERHANG != 0 && state.alphabet != 2 {
-            return Err(invalid("overhang requires IUPAC"));
-        }
         let mut result = state.spare_result.take().unwrap_or_default();
         if !text.is_empty() {
             for (i, p) in patterns.iter().enumerate() {
                 let pattern = unsafe { bytes(*p)? };
                 // An unwinding kernel must not leave a reusable, apparently healthy searcher.
                 state.poisoned = true;
-                let engine = if opts.reserved & PARTIAL_OVERHANG != 0 {
-                    let rc = state.reverse_complement;
-                    state.partial_engine.get_or_insert_with(||
-                        Engine::Iupac(Searcher::<Iupac>::new(rc, Some(0.5))))
-                } else {
-                    &mut state.engine
-                };
+                let engine = &mut state.engine;
                 let matches = match engine {
                     Engine::Ascii(s) => {
                         if opts.all_endpoints != 0 {
@@ -605,9 +595,13 @@ unsafe extern "C" fn sassy_c_result_ops_view(
     count: *mut usize,
 ) -> i32 {
     guard(|| {
-        if spans.is_null() || ops.is_null() || count.is_null() { return Err(invalid("operation view output slot is NULL")); }
+        if spans.is_null() || ops.is_null() || count.is_null() {
+            return Err(invalid("operation view output slot is NULL"));
+        }
         unsafe { *spans = ptr::null(); *ops = ptr::null(); *count = 0; }
-        if result.is_null() { return Err(invalid("result is NULL")); }
+        if result.is_null() {
+            return Err(invalid("result is NULL"));
+        }
         let r = unsafe { &*result };
         unsafe {
             if !r.op_spans.is_empty() { *spans = r.op_spans.as_ptr(); }
@@ -961,14 +955,13 @@ mod tests {
             assert_eq!(hit.text_start, 2);
             assert_eq!(hit.pattern_start, 0);
         }
-        let mut overhang = sassy::Searcher::<sassy::profiles::Iupac>::new_fwd_with_overhang(0.5);
-        let partial = overhang.search(b"ATCGATCG", b"ATCGGGGGGGGGG", 2);
-        assert!(partial.iter().any(|hit| hit.pattern_start == 4 && hit.cigar.to_string() == "4="));
     }
     fn aligned_text_from_packed(ops: &[u32], reverse: bool) -> String {
         let mut pairs: Vec<_> = ops.iter().filter_map(|&word| {
             let code = word & 15;
-            if code == 4 { return None; }
+            if code == 4 {
+                return None;
+            }
             Some((word >> 4, match code {
                 1 => 'I', 2 => 'D', 7 => '=', 8 => 'X', _ => panic!("unexpected BAM opcode"),
             }))
@@ -979,24 +972,26 @@ mod tests {
 
     #[test]
     fn packed_views_and_clips() {
-        let mut searcher = sassy::Searcher::<sassy::profiles::Iupac>::new_fwd_with_overhang(0.5);
-        let partial = searcher.search(b"ATCGATCG", b"ATCGGGGGGGGGG", 2).into_iter()
-            .find(|hit| hit.pattern_start == 4 && hit.cigar.to_string() == "4=").unwrap();
+        let mut searcher = sassy::Searcher::<sassy::profiles::Iupac>::new_fwd();
+        let mut partial = searcher.search(b"ATCG", b"ATCG", 0).remove(0);
+        partial.pattern_start = 2;
+        partial.pattern_end = 6;
         let opts = SassyOptions { struct_size: std::mem::size_of::<SassyOptions>() as u32,
             all_endpoints: 0, include_cigar: 0, reserved: PACKED_CIGAR };
         let mut result = SassyResult::default();
-        append_matches(&mut result, vec![partial], 0, 8, &opts).unwrap();
-        assert_eq!(result.ops, vec![(4 << 4) | 4, (4 << 4) | 7]);
+        append_matches(&mut result, vec![partial], 0, 10, &opts).unwrap();
+        assert_eq!(result.ops, vec![(2 << 4) | 4, (4 << 4) | 7, (4 << 4) | 4]);
         assert_eq!(aligned_text_from_packed(&result.ops, false), "4=");
         assert!(result.cigars.is_empty());
         result.ops.clear();
         result.op_spans.clear();
-        let mut rc_partial = sassy::Searcher::<sassy::profiles::Iupac>::new_rc_with_overhang(0.5);
-        let reverse_partial = rc_partial.search(b"ATCGATCG", b"CGATGGGGGGGGG", 2).into_iter()
-            .find(|hit| hit.strand == Strand::Rc && hit.pattern_end == 4 &&
-                  hit.cigar.to_string() == "4=").unwrap();
-        append_matches(&mut result, vec![reverse_partial], 0, 8, &opts).unwrap();
-        assert_eq!(result.ops, vec![(4 << 4) | 4, (4 << 4) | 7]);
+        let mut rc_partial = sassy::Searcher::<sassy::profiles::Iupac>::new_rc();
+        let mut reverse_partial = rc_partial.search(b"ATCG", b"CGAT", 0).into_iter()
+            .find(|hit| hit.strand == Strand::Rc).unwrap();
+        reverse_partial.pattern_start = 2;
+        reverse_partial.pattern_end = 6;
+        append_matches(&mut result, vec![reverse_partial], 0, 10, &opts).unwrap();
+        assert_eq!(result.ops, vec![(4 << 4) | 4, (4 << 4) | 7, (2 << 4) | 4]);
         assert_eq!(aligned_text_from_packed(&result.ops, true), "4=");
         result.ops.clear();
         result.op_spans.clear();
@@ -1020,7 +1015,7 @@ mod tests {
         append_matches(&mut result, vec![substitution], 0, 4, &opts).unwrap();
         assert_eq!(result.ops, vec![(1 << 4) | 8, (3 << 4) | 7]);
         assert_eq!(aligned_text_from_packed(&result.ops, false), "1X3=");
-        let bad = SassyOptions { reserved: PACKED_CIGAR | 4, ..opts };
+        let bad = SassyOptions { reserved: PACKED_CIGAR | 2, ..opts };
         assert!(validate_options(&bad).is_err());
     }
     #[test]

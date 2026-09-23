@@ -10,7 +10,8 @@ WITH cases(text, strand, cigar, ops, span) AS (
     ('GGTGCACGTCC', '-', '3=1I4=', [71::UINTEGER, 17, 55], 7)
 ), observed AS (
     SELECT c.*, h AS hit
-    FROM cases c, UNNEST(sassy_matches_both('ACGTTGCA', c.text, 1, alphabet := 'dna')) AS t(h)
+    FROM cases c, UNNEST(sassy_matches('ACGTTGCA', c.text, 1,
+        alphabet := 'dna', cigar_format := 'both')) AS t(h)
     WHERE h.strand = c.strand AND h.text_start = 2 AND h.pattern_start = 0
 )
 SELECT CASE WHEN count(*) = 6 AND bool_and(
@@ -20,29 +21,35 @@ SELECT CASE WHEN count(*) = 6 AND bool_and(
         hit.pattern_end - hit.pattern_start)
     THEN true ELSE error('packed CIGAR order, axes or geometry') END FROM observed;
 
-SELECT CASE WHEN (sassy_matches_packed('ACGTTGCA', 'GGACGTTTGCACC', 1, alphabet := 'dna'))[1].cigar IS NULL
-    AND (sassy_matches_packed('ACGTTGCA', 'GGACGTTTGCACC', 1, alphabet := 'dna'))[1].cigar_ops = [55::UINTEGER, 18, 87]
-    AND (sassy_matches_many_packed(['ACGTTGCA', 'ACGTTGCA'], 'GGACGTTGCACC', 0,
-            alphabet := 'dna'))[2].cigar_ops = [135::UINTEGER]
-    AND (sassy_matches_many_both(['ACGTTGCA'], 'GGACGTTGCACC', 0,
-            alphabet := 'dna'))[1].cigar = '8='
-    AND sassy_matches_packed('ACGTTGCA', NULL, 0) IS NULL
-    AND sassy_matches_packed('ACGTTGCA', 'GGGGGGGGGG', 0) = []
-    THEN true ELSE error('packed-only, panel or NULL contract') END;
+SELECT CASE WHEN (sassy_matches('ACGTTGCA', 'GGACGTTTGCACC', 1,
+            alphabet := 'dna', cigar_format := 'packed'))[1].cigar IS NULL
+    AND (sassy_matches('ACGTTGCA', 'GGACGTTTGCACC', 1,
+            alphabet := 'dna', cigar_format := 'packed'))[1].cigar_ops = [55::UINTEGER, 18, 87]
+    AND (sassy_matches_many(['ACGTTGCA', 'ACGTTGCA'], 'GGACGTTGCACC', 0,
+            alphabet := 'dna', cigar_format := 'packed'))[2].cigar_ops = [135::UINTEGER]
+    AND (sassy_matches_many(['ACGTTGCA'], 'GGACGTTGCACC', 0,
+            alphabet := 'dna', cigar_format := 'both'))[1].cigar = '8='
+    AND (sassy_matches('ACGTTGCA', 'GGACGTTGCACC', 0, alphabet := 'dna'))[1].cigar_ops IS NULL
+    AND (sassy_matches('ACGTTGCA', 'GGACGTTGCACC', 0, alphabet := 'dna'))[1].cigar = '8='
+    AND sassy_matches('ACGTTGCA', NULL, 0, cigar_format := 'packed') IS NULL
+    AND sassy_matches('ACGTTGCA', 'GGGGGGGGGG', 0, cigar_format := 'packed') = []
+    THEN true ELSE error('packed, panel, default or NULL contract') END;
 
-WITH partials(text, strand, start_pos, end_pos) AS (
-    VALUES ('ATCGGGGGGGGGG', '+', 4, 8), ('CGATGGGGGGGGG', '-', 0, 4)
-), observed AS (
-    SELECT p.*, hit FROM partials p,
-         UNNEST(sassy_matches_both_overhang('ATCGATCG', p.text, 2)) t(hit)
-    WHERE hit.strand = p.strand AND hit.pattern_start = p.start_pos
-          AND hit.pattern_end = p.end_pos AND hit.text_start = 0 AND hit.cigar = '4='
+WITH formats AS (
+    SELECT i, CASE i % 3 WHEN 0 THEN 'text' WHEN 1 THEN 'packed'
+                        ELSE 'both' END AS format
+    FROM range(4096) t(i)
+), results AS (
+    SELECT i, format, sassy_matches('ACGTTGCA', 'GGACGTTGCACC', 0,
+        alphabet := 'dna', cigar_format := format)[1] AS hit
+    FROM formats
 )
-SELECT CASE WHEN count(*) = 2 AND bool_and(
-    hit.cigar_ops = [68::UINTEGER, 71] AND hit.text_end - hit.text_start = 4
-    AND list_sum(list_transform(hit.cigar_ops, x -> IF((x & 15) IN (7,8,2), x >> 4, 0))) = 4
-    AND list_sum(list_transform(hit.cigar_ops, x -> IF((x & 15) IN (7,8,1), x >> 4, 0))) = 4)
-    THEN true ELSE error('partial alignment and SAM clip orientation') END FROM observed;
+SELECT CASE WHEN count(*) = 4096 AND bool_and(
+    hit.text_start = 2 AND
+    CASE format WHEN 'text' THEN hit.cigar = '8=' AND hit.cigar_ops IS NULL
+                WHEN 'packed' THEN hit.cigar IS NULL AND hit.cigar_ops = [135::UINTEGER]
+                ELSE hit.cigar = '8=' AND hit.cigar_ops = [135::UINTEGER] END)
+    THEN true ELSE error('row-varying cigar_format') END FROM results;
 
 WITH inputs AS (
     SELECT i, CASE WHEN i % 3 = 0 THEN 'GGACGTTGCACC'
@@ -50,7 +57,8 @@ WITH inputs AS (
                    ELSE 'GGGGGGGGGG' END AS text
     FROM range(4096) t(i)
 ), outputs AS (
-    SELECT i, sassy_matches_packed('ACGTTGCA', text, 1, alphabet := 'dna') AS hits
+    SELECT i, sassy_matches('ACGTTGCA', text, 1, alphabet := 'dna',
+        cigar_format := 'packed') AS hits
     FROM inputs
 )
 SELECT CASE WHEN count(*) = 4096 AND bool_and(

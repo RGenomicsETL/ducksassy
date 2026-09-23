@@ -55,31 +55,9 @@ static void check_packed(sassy_c_searcher *searcher, const char *text,
     assert(spans != NULL && ops != NULL);
     sassy_c_result_free(result);
     result = NULL;
-    opts.reserved |= SASSY_C_PARTIAL_OVERHANG;
+    opts.reserved |= 2;
     assert(sassy_c_search(searcher, span("ACGTTGCA"), span(text), 1, &opts, &result) == SASSY_C_INVALID);
     assert(result == NULL);
-}
-static void check_partial(sassy_c_searcher *searcher, const char *text, uint8_t strand,
-                          uint64_t start, uint64_t end, const uint32_t *expected) {
-    sassy_c_options opts = {sizeof(opts), 0, 1, SASSY_C_PACKED_CIGAR | SASSY_C_PARTIAL_OVERHANG};
-    sassy_c_result *result = NULL;
-    assert(sassy_c_search(searcher, span("ATCGATCG"), span(text), 2, &opts, &result) == SASSY_C_OK);
-    const sassy_c_hit *hits = NULL;
-    const uint8_t *cigars = NULL;
-    const sassy_c_op_span *spans = NULL;
-    const uint32_t *ops = NULL;
-    size_t n = 0, bytes = 0, count = 0;
-    assert(sassy_c_result_view(result, &hits, &n, &cigars, &bytes) == SASSY_C_OK);
-    assert(sassy_c_result_ops_view(result, &spans, &ops, &count) == SASSY_C_OK);
-    size_t i = 0;
-    while (i < n && !(hits[i].strand == strand && hits[i].pattern_start == start &&
-                      hits[i].pattern_end == end && hits[i].text_start == 0 &&
-                      hits[i].cigar_length == 2 &&
-                      memcmp(cigars + hits[i].cigar_offset, "4=", 2) == 0)) ++i;
-    assert(i < n && hits[i].text_end == 4 && spans[i].length == 2);
-    assert(spans[i].offset + 2 <= count);
-    assert(memcmp(ops + spans[i].offset, expected, 2 * sizeof(uint32_t)) == 0);
-    sassy_c_result_free(result);
 }
 int main(void) {
     assert(sassy_c_abi_version() == SASSY_C_ABI_VERSION);
@@ -139,14 +117,6 @@ int main(void) {
     check_packed(searcher, "GGTGCAACGTCC", 1, "8=", exact, 1);
     check_packed(searcher, "GGTGCAAACGTCC", 1, "3=1D5=", rc_del, 3);
     check_packed(searcher, "GGTGCACGTCC", 1, "3=1I4=", rc_ins, 3);
-    sassy_c_searcher_free(searcher);
-
-    assert(sassy_c_searcher_new(SASSY_C_IUPAC, 0, &searcher) == SASSY_C_OK);
-    const uint32_t fwd_partial[] = {(4U << 4) | 4U, (4U << 4) | 7U};
-    check_partial(searcher, "ATCGGGGGGGGGG", 0, 4, 8, fwd_partial);
-    sassy_c_searcher_free(searcher);
-    assert(sassy_c_searcher_new(SASSY_C_IUPAC, 1, &searcher) == SASSY_C_OK);
-    check_partial(searcher, "CGATGGGGGGGGG", 1, 0, 4, fwd_partial);
     sassy_c_searcher_free(searcher);
 
     assert(sassy_c_searcher_new(SASSY_C_IUPAC, 1, &searcher) == SASSY_C_OK);

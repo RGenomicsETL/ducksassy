@@ -15,7 +15,6 @@ extern "C" {
 #define SASSY_C_DNA 1U
 #define SASSY_C_IUPAC 2U
 #define SASSY_C_PACKED_CIGAR 1U /* options.reserved bit: request packed ops */
-#define SASSY_C_PARTIAL_OVERHANG 2U /* enable Sassy alpha=0.5 IUPAC overhang search */
 
 typedef struct sassy_c_searcher sassy_c_searcher;
 typedef struct sassy_c_result sassy_c_result;
@@ -59,9 +58,9 @@ typedef struct {
     uint32_t selected;
 } sassy_c_backend_status;
 
-/* ABI 1: sizeof(options)=16, sizeof(hit)=64. Initialize reserved=0 or
- * SASSY_C_PACKED_CIGAR and/or SASSY_C_PARTIAL_OVERHANG and
- * struct_size=sizeof(sassy_c_options). Flags are 0/1, not ABI-dependent enums.
+/* ABI 1: sizeof(options)=16, sizeof(hit)=64. Set struct_size=sizeof(sassy_c_options).
+ * reserved is a bit set: only SASSY_C_PACKED_CIGAR is defined; other bits
+ * are rejected. all_endpoints and include_cigar are 0/1, not ABI-dependent enums.
  * DNA/IUPAC inputs accept either case; ASCII uses literal bytes <128 (NUL allowed).
  * Empty texts/panels produce an empty result. Empty/NULL panel elements error.
  * Patterns contain 1..4096 bytes, panels <=4096 patterns, k < every pattern length.

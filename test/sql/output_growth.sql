@@ -19,8 +19,13 @@ SELECT CASE WHEN count(*) FILTER (WHERE row_id % 5 = 0 AND hits IS NULL) = 820
 FROM growth_results;
 
 CREATE TEMP TABLE growth_actual AS
-SELECT row_id, hit.*
+SELECT row_id, hit.pattern_idx, hit.text_start, hit.text_end, hit.pattern_start,
+       hit.pattern_end, hit.cost, hit.strand, hit.cigar
 FROM (SELECT row_id, unnest(hits) AS hit FROM growth_results);
+
+SELECT CASE WHEN bool_and(hit.cigar_ops IS NULL) THEN true
+            ELSE error('text format: unexpected packed operations') END
+FROM growth_results, unnest(hits) AS matches(hit);
 
 CREATE TEMP TABLE growth_expected AS
 SELECT row_id, 0::UBIGINT AS pattern_idx,
