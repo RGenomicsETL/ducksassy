@@ -289,9 +289,9 @@ SELECT sassy_contains('ACGA', 'TTACGATT', 0, rc := false) AS contains;
 SELECT unnest(sassy_matches('ACGA', 'TTACGATT', 0, rc := false), recursive := true);
 ```
 
-| pattern_idx | text_start | text_end | pattern_start | pattern_end | cost | strand | cigar |
-|------------:|-----------:|---------:|--------------:|------------:|-----:|--------|-------|
-|           0 |          2 |        6 |             0 |           4 |    0 | \+     | 4=    |
+| pattern_idx | text_start | text_end | pattern_start | pattern_end | cost | strand | cigar | cigar_ops |
+|------------:|-----------:|---------:|--------------:|------------:|-----:|--------|-------|-----------|
+|           0 |          2 |        6 |             0 |           4 |    0 | \+     | 4=    | NULL      |
 
 ## Function cheat sheet
 
@@ -312,19 +312,17 @@ skip building CIGAR strings.
 
 ### Packed CIGAR
 
-Use `sassy_matches_packed` (or `sassy_matches_many_packed`) for typed
-`cigar_ops UINTEGER[]`; these leave `cigar` NULL. Use `sassy_matches_both`
-(or `sassy_matches_many_both`) to receive the existing text CIGAR and packed
-ops together. The arguments and defaults match `sassy_matches`. Packed-only
-materialization skips string formatting but allocates a typed list for each hit;
-no before/after timing has been measured. For partial alignments, use
-`sassy_matches_packed_overhang` or `sassy_matches_both_overhang` (IUPAC only,
-Sassy overhang penalty `alpha=0.5`); their packed ops include soft clips.
+Set `cigar_format := 'packed'` on `sassy_matches` or `sassy_matches_many`
+for typed `cigar_ops UINTEGER[]` without formatting text CIGAR (`cigar` is
+NULL). Set `cigar_format := 'both'` for both representations. The default
+`'text'` returns text CIGAR and NULL `cigar_ops`. All formats share a fixed
+result struct with both nullable fields. Packed ops include soft clips for
+any partial pattern coverage returned by the search.
 
 ``` sql
 SELECT hit.text_start, hit.cigar_ops
-FROM UNNEST(sassy_matches_packed('ACGTTGCA', 'GGTGCAAACGTCC', 1,
-    alphabet := 'dna')) AS matches(hit)
+FROM UNNEST(sassy_matches('ACGTTGCA', 'GGTGCAAACGTCC', 1,
+    alphabet := 'dna', cigar_format := 'packed')) AS matches(hit)
 WHERE hit.strand = '-';
 ```
 
@@ -333,8 +331,8 @@ result can be passed directly (this snippet is not an executed example):
 
 ``` sql
 SELECT cigar_aligned_blocks(hit.cigar_ops, hit.text_start)
-FROM UNNEST(sassy_matches_packed('ACGTTGCA', 'GGTGCAAACGTCC', 1,
-    alphabet := 'dna')) AS matches(hit)
+FROM UNNEST(sassy_matches('ACGTTGCA', 'GGTGCAAACGTCC', 1,
+    alphabet := 'dna', cigar_format := 'packed')) AS matches(hit)
 WHERE hit.strand = '-';
 ```
 

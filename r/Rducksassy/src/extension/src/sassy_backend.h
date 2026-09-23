@@ -3,7 +3,7 @@
 
 #include "sassy_c.h"
 
-#define SASSY_C_BACKEND_TABLE_VERSION 1U
+#define SASSY_C_BACKEND_TABLE_VERSION 2U
 
 #ifndef SASSY_C_HAVE_SCALAR
 #define SASSY_C_HAVE_SCALAR 1
@@ -39,6 +39,8 @@ typedef struct {
                            const uint8_t **cigars, size_t *cigar_bytes);
     void (*result_free)(sassy_c_result *result);
     void (*result_recycle)(sassy_c_searcher *searcher, sassy_c_result *result);
+    int32_t (*result_ops_view)(const sassy_c_result *result, const sassy_c_op_span **spans,
+                               const uint32_t **ops, size_t *count);
 } sassy_c_backend_table;
 
 typedef const sassy_c_backend_table *(*sassy_c_backend_getter)(void);
