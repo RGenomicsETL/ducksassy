@@ -1,0 +1,58 @@
+name: Wasm compatibility probes
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.71'
+          actions-cache-folder: '.deps-port/emsdk-cache'
+      - name: Build scalar side modules through extension-ci-tools
+        run: |
+          make wasm_mvp
+          make wasm_eh
+          for variant in wasm_mvp wasm_eh; do
+            mkdir -p ".deps-port/artifacts/$variant"
+            cp "build/$variant/extension/ducksassy/ducksassy.duckdb_extension.wasm" ".deps-port/artifacts/$variant/"
+          done
+      - name: Validate module features
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt
+          for variant in wasm_mvp wasm_eh; do
+            artifact=".deps-port/artifacts/$variant/ducksassy.duckdb_extension.wasm"
+            # WABT defaults also disallow exception instructions and shared memory.
+            wasm-validate --disable-simd "$artifact"
+            wasm-objdump -x -j target_features "$artifact"
+          done
+      - name: Install Chromium system dependencies
+        run: |
+          mkdir -p .deps-port/wasm-node
+          cp test/wasm/package*.json .deps-port/wasm-node/
+          npm ci --prefix .deps-port/wasm-node --no-audit --no-fund
+          .deps-port/wasm-node/node_modules/.bin/playwright install --with-deps chromium
+      - name: SQL examples and panic-ABI distribution gate
+        # MVP/EH remain excluded while their panic probes fail recovery.
+        run: make wasm-playwright-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wasm-probe-results
+          path: test/wasm/test-results

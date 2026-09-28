@@ -5,7 +5,12 @@ import re
 import tomllib
 
 root = Path(__file__).resolve().parents[1]
-source = (root / "src/ducksassy.c").read_text()
+source = (root / "src/host_v2.c").read_text()
+core = (root / "src/ducksassy_core.c").read_text() + (root / "src/ducksassy_core.h").read_text()
+assert 'duckdb_' not in core
+v1 = (root / "src/host_v1.c").read_text()
+assert 'DUCKDB_EXTENSION_ENTRYPOINT' in v1
+assert 'DUCKDB_EXTENSION_API_VERSION_UNSTABLE' not in v1
 cargo = tomllib.loads((root / "rust/Cargo.toml").read_text())
 assert set(cargo["dependencies"]) == {"sassy", "pa-types"}
 assert "staticlib" in cargo["lib"]["crate-type"]
@@ -20,6 +25,6 @@ assert all(name.startswith("duckdb_v2_") for name in called), called
 assert "ThreadPool" not in (root / "rust/src/lib.rs").read_text()
 bootstrap = (root / "sql/ducksassy.sql").read_text()
 assert bootstrap.index("LOAD duckhts;") < bootstrap.index("LOAD ducksassy;")
-assert "duckhts_htslib_version()" in bootstrap
+assert "duckhts_htslib_version()" not in bootstrap
 assert "scan_mode := 'sequential'" in bootstrap
 print("Architecture contract checks passed (not a runtime test)")

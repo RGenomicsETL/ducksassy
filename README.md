@@ -3,6 +3,10 @@
 
 # ducksassy
 
+[![Distribution CI](https://github.com/RGenomicsETL/ducksassy/actions/workflows/MainDistributionPipeline.yml/badge.svg)](https://github.com/RGenomicsETL/ducksassy/actions/workflows/MainDistributionPipeline.yml)
+[![R CMD check](https://github.com/RGenomicsETL/ducksassy/actions/workflows/cran-check.yml/badge.svg)](https://github.com/RGenomicsETL/ducksassy/actions/workflows/cran-check.yml)
+[Documentation](https://rgenomicsetl.github.io/ducksassy/)
+
 Approximate string matching inside DuckDB.
 
 [DuckHTS](https://github.com/RGenomicsETL/duckhts) exposes FASTA and FASTQ records
@@ -71,13 +75,60 @@ whole-human-genome throughput or peak memory use.
 
 ## Quick start
 
-ducksassy targets the DuckDB C API v2 preview (DuckDB 1.x cannot load it).
+### Released DuckDB v1 host
+
+DuckDB v1.5.5 can load the stable v1.2.0 C API artifact without DuckHTS or
+an external SQL bootstrap:
+
+``` sh
+make sdk-v1 release-v1
+.deps-v1/cli/duckdb -unsigned -no-init
+```
+
+``` sql
+LOAD 'build-v1/ducksassy.duckdb_extension';
+SELECT sassy_count('ACGT', 'TTACGT', 0, 'dna', false);
+SELECT * FROM sassy_grep('error', 'error: disk full', 0);
+SELECT * FROM sassy_backend_info();
+```
+
+Download the CLI separately as described in
+[host architecture, setup and measurements](docs/v1-host.md). Every v1 function,
+with signatures and examples, is listed in the [function reference](docs/functions.md).
+V1 `LOAD` writes no catalog entries and works on a read-only database.
+Scalars use positional trailing options: `alphabet, rc, all_endpoints, cigar_format` for matches, and `pam_length, allow_pam_edits, max_n_frac, rc`
+for CRISPR. Defaults and VARCHAR/BLOB support match v2. V1 has no file or
+relation-name helpers; compose native calls with a table, CTE or explicitly
+loaded DuckHTS reader:
+
+``` sql
+LOAD '/absolute/path/duckhts.duckdb_extension';
+SELECT r.*, hit
+FROM read_fasta('reference.fa', scan_mode := 'sequential') r
+CROSS JOIN LATERAL unnest(
+    sassy_matches('ACGTAGG', r.sequence, 1, 'iupac', false, false, 'both')
+) AS matches(hit);
+```
+
+Use `read_fastq(...)` for reads, `_many` with a pattern list for panels, or
+`sassy_crispr_matches(guide, r.sequence, k)` for CRISPR. The v1 build uses
+`DUCKSASSY_HOST=v1`; standalone CMake defaults to `v2`. Keep their build directories separate.
+Distribution CI uses `make configure release test_release`, which produces the
+v1 artifact under `build/release/`; see the [CI contract](docs/v1-host.md#distribution-and-ci).
+The distribution matrix covers Linux and macOS x86-64/ARM64, plus Windows x86-64
+MinGW and Rtools. MSVC is unsupported. Wasm MVP/EH pass browser SQL probes but
+remain excluded because Rust panic recovery fails; Wasm threads also require
+an atomics-enabled Rust standard library. See the [portable build evidence](docs/v1-host.md#portable-builds).
+
+### Pinned C API v2 host
+
+The v2 artifact targets the DuckDB C API v2 preview.
 `make setup` fetches the matching CLI and checks the bundled SDK. On Linux x86-64 you need C/C++
 compilers, CMake ≥ 3.20, Python ≥ 3.11, Git, R ≥ 4.1 and rustup.
 
 ``` sh
 make setup JOBS=4
-make release
+make release-v2
 .deps/duckdb-build/duckdb -unsigned -no-init
 ```
 
@@ -91,7 +142,10 @@ INSTALL 'build/ducksassy.duckdb_extension';
 ```
 
 The lambda setting is required by DuckHTS 1.5.2 and applies to the whole
-database instance, so use a dedicated one. The macros are connection-scoped.
+database instance, so use a dedicated one. V2 keeps its connection-scoped
+macros, `:=` scalar options and file/relation helpers. Positional trailing
+options are v1-only: a same-named macro shadows a native function in v2
+([binding probe](test/v2_macro_collision.sql)).
 Supported host versions are pinned in
 [ducksassy-package.json](ducksassy-package.json). When upgrading, move an
 outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
@@ -105,7 +159,7 @@ Its examples include searching BAM read sequences while retaining alignment
 identifiers for SQL joins and summaries.
 
 ``` r
-install.packages("Rducksassy", repos = c(
+install.packages(c("Rducksassy", "Rduckhts"), repos = c(
   "https://rgenomicsetl.r-universe.dev",
   "https://duckdb.r-universe.dev",
   "https://cloud.r-project.org"
@@ -459,9 +513,11 @@ library; an unavailable request returns an error, and changing it requires a
 fresh process.
 `scalar` follows Sassy’s baseline and includes SSE2 on x86-64; SSE4.1 has no
 separate tier. Linux x86-64 baseline and AVX2 are tested; AVX-512 is compiled
-but unexecuted, and aarch64/NEON is unverified. Emscripten builds select
-`wasm128` at compile time. CI typechecks the Rust wasm target; a linked
-DuckDB-Wasm extension has not been validated.
+but unexecuted, and aarch64/NEON is unverified here. Windows MinGW selects AVX2
+under Wine with DuckDB R 1.5.5. Emscripten MVP/EH probes use only `scalar`;
+`wasm128` is reserved for the threaded build. Browser SQL tests verify the
+scalar catalog and examples, but Wasm distribution is blocked by Rust’s
+exception/shared-memory compatibility; see [the platform checks](docs/v1-host.md#portable-builds).
 
 </details>
 <details>
@@ -478,7 +534,7 @@ limits; [test/c/test_abi.c](test/c/test_abi.c) is a working example.
 ## Development
 
 ``` sh
-make test sql-test oracle-test readme
+make test-v2 sql-test oracle-test readme
 ```
 
 `oracle-test` compares complete CRISPR hit multisets against the Sassy

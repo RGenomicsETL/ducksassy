@@ -1,0 +1,86 @@
+# Native v1 public API: LOAD needs neither DuckHTS nor SQL bootstrap macros.
+require ducksassy
+
+query I
+SELECT count(DISTINCT function_name) FROM duckdb_functions()
+WHERE function_name LIKE 'sassy_%' AND internal AND function_type IN ('scalar', 'table');
+----
+10
+
+query I
+SELECT count(*) FROM duckdb_functions()
+WHERE function_name LIKE '%sassy%' AND function_type LIKE '%macro%';
+----
+0
+
+query IIIIII
+SELECT sassy_count('ACGA', 'TTACGA', 0),
+       sassy_count('ACGA'::BLOB, 'TTACGA'::BLOB, 0),
+       sassy_contains('ACGA', 'TTACGA', 0),
+       sassy_count('AN', 'AT', 0) > 0,
+       sassy_count_many(['ACGA', 'ACGA'], 'ACGA', 0),
+       sassy_contains_many(['ACGA']::BLOB[], 'ACGA'::BLOB, 0);
+----
+1	1	1	1	2	1
+
+query IIII
+SELECT sassy_count_many([]::VARCHAR[], 'ACGA', 0),
+       sassy_matches_many([]::BLOB[], 'ACGA'::BLOB, 0) = [],
+       sassy_matches('ACGA', NULL, 0) IS NULL,
+       sassy_count('ACGA', 'ACGA', NULL) IS NULL;
+----
+0	1	1	1
+
+query TIII
+SELECT sassy_matches('ACGA', 'ACGA', 0)[1].cigar,
+       sassy_matches('ACGA', 'ACGA', 0)[1].cigar_ops IS NULL,
+       sassy_matches('ACGA', 'ACGA', 0, 'dna', false, false, 'packed')[1].cigar IS NULL,
+       sassy_matches('ACGA', 'ACGA', 0, 'dna', false, false, 'packed')[1].cigar_ops = [71::UINTEGER];
+----
+4=	1	1	1
+
+query TI
+SELECT sassy_matches_many(['ACGA'], 'ACGA', 0, 'dna', false, false, 'both')[1].cigar,
+       sassy_matches_many(['ACGA'], 'ACGA', 0, 'dna', false, false, 'both')[1].cigar_ops = [71::UINTEGER];
+----
+4=	1
+
+query III
+SELECT len(sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0)),
+       len(sassy_crispr_matches_many(['ACGTNGG']::BLOB[], 'ACGTAGG'::BLOB, 0)),
+       len(sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, 3, false, 0.2, false));
+----
+1	1	1
+
+# Relation search composes native values with a lateral UNNEST.
+query IT rowsort
+SELECT id, hit.cigar
+FROM (VALUES (1, 'ACGA'), (2, 'CCCC')) AS input(id, sequence)
+CROSS JOIN LATERAL UNNEST(sassy_matches('ACGA', sequence, 0, 'dna', false)) AS matches(hit);
+----
+1	4=
+
+query II
+SELECT count(*), count(*) FILTER (WHERE selected) FROM sassy_backend_info();
+----
+5	1
+
+query I
+SELECT count(*) FROM sassy_grep('timeout', 'request timedout', 1);
+----
+1
+
+query I
+SELECT count(*) FROM (SELECT * FROM sassy_grep('a', repeat('a', 10000), 0) LIMIT 1);
+----
+1
+
+query I
+SELECT count(*) FROM sassy_grep('a' || chr(0) || 'b', 'xa' || chr(0) || 'by', 0);
+----
+1
+
+statement error
+SELECT sassy_matches('ACGA', 'ACGA', 0, 'dna', false, false, 'invalid');
+----
+cigar_format must be text, packed, or both

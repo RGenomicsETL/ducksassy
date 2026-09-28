@@ -86,7 +86,8 @@ adapter_benchmark <- function(label, repetitions = 7L) {
   write.csv(do.call(rbind, checks), file.path(output, "checks.csv"), row.names = FALSE)
   jsonlite::write_json(list(
     source_revision = system2("git", c("rev-parse", "HEAD"), stdout = TRUE),
-    adapter_source_sha256 = digest::digest(file = "src/ducksassy.c", algo = "sha256"),
+    adapter_source_sha256 = digest::digest(file = "src/host_v2.c", algo = "sha256"),
+    core_source_sha256 = digest::digest(file = "src/ducksassy_core.c", algo = "sha256"),
     extension_sha256 = digest::digest(file = extension, algo = "sha256"),
     benchmark_binary_sha256 = digest::digest(file = binary, algo = "sha256"),
     rust_driver_sha256 = digest::digest(file = "rust/examples/adapter_bench.rs", algo = "sha256"),
