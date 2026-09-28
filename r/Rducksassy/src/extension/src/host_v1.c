@@ -129,7 +129,8 @@ static bool input_valid(void *pointer, unsigned argument, uint64_t row) {
 static sassy_c_slice input_string(void *pointer, unsigned argument, uint64_t row) {
     scalar_context *context = pointer;
     if (!context->views[argument].data) {
-        return argument == ARG_CIGAR_FORMAT ? (sassy_c_slice){(const uint8_t *)"text", 4} :
+        return argument == ARG_CIGAR_FORMAT || argument == ARG_CRISPR_CIGAR_FORMAT ?
+            (sassy_c_slice){(const uint8_t *)"text", 4} :
             (sassy_c_slice){(const uint8_t *)"iupac", 5};
     }
     duckdb_string_t *value = &((duckdb_string_t *)context->views[argument].data)[row];
@@ -155,7 +156,8 @@ static panel_entry input_list(void *pointer, uint64_t row) {
 static bool output_hits(void *pointer, const hit_batch_view *batch, uint64_t offset) {
     scalar_context *context = pointer;
     if (!batch->hit_count) return true;
-    bool extended = context->function->operation->kind == OP_MATCHES;
+    bool extended = context->function->operation->kind == OP_MATCHES ||
+                    context->function->operation->kind == OP_CRISPR;
     unsigned field_count = extended ? HIT_FIELD_COUNT : HIT_CIGAR_OPS;
     uint64_t needed = offset + batch->hit_count;
     if (needed > context->capacity) {
@@ -259,7 +261,8 @@ static void scalar_exec(duckdb_function_info info, duckdb_data_chunk input, duck
         duckdb_vector vector = duckdb_data_chunk_get_vector(input, argument);
         unsigned slot = argument;
         if (operation->kind == OP_CRISPR && argument >= 4) {
-            static const unsigned slots[] = {ARG_ALLOW_PAM_EDITS, ARG_MAX_N_FRACTION, ARG_REVERSE_COMPLEMENT};
+            static const unsigned slots[] = {ARG_ALLOW_PAM_EDITS, ARG_MAX_N_FRACTION,
+                                             ARG_REVERSE_COMPLEMENT, ARG_CRISPR_CIGAR_FORMAT};
             slot = slots[argument - 4];
         }
         context.views[slot] = (input_view){duckdb_vector_get_data(vector), duckdb_vector_get_validity(vector)};
@@ -327,7 +330,8 @@ static bool add_operation(duckdb_scalar_function_set set, const search_operation
     duckdb_type ids[CRISPR_ARGUMENT_COUNT] = {sequence_type, sequence_type, DUCKDB_TYPE_BIGINT,
         crispr ? DUCKDB_TYPE_BIGINT : DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_BOOLEAN,
         crispr ? DUCKDB_TYPE_DOUBLE : DUCKDB_TYPE_BOOLEAN,
-        crispr ? DUCKDB_TYPE_BOOLEAN : DUCKDB_TYPE_VARCHAR};
+        crispr ? DUCKDB_TYPE_BOOLEAN : DUCKDB_TYPE_VARCHAR,
+        DUCKDB_TYPE_VARCHAR};
     for (unsigned i = 0; i < count; ++i) {
         duckdb_logical_type type = duckdb_create_logical_type(ids[i]);
         if (i == ARG_PATTERN && operation->panel) {
@@ -340,7 +344,7 @@ static bool add_operation(duckdb_scalar_function_set set, const search_operation
     }
     duckdb_logical_type result = operation->kind == OP_COUNT ? duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT) :
         operation->kind == OP_CONTAINS ? duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN) :
-        hit_type(operation->kind == OP_MATCHES);
+        hit_type(operation->kind == OP_MATCHES || operation->kind == OP_CRISPR);
     duckdb_scalar_function_set_return_type(function, result);
     duckdb_destroy_logical_type(&result);
     duckdb_state status = duckdb_add_scalar_function_to_set(set, function);

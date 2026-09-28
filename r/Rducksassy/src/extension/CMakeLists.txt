@@ -120,7 +120,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             "-C link-arg=--no-entry -C link-arg=-O1 -C target-feature=+simd128,+atomics,+bulk-memory")
         list(APPEND SASSY_BACKEND_DEFINITIONS SASSY_C_HAVE_SCALAR=0 SASSY_C_HAVE_WASM128=1)
     else()
-        # Rust 1.91's prebuilt std requires JS-based exception handling.
+        # Rust's Emscripten std uses JS EH; a Rust panic invalidates the worker.
         add_sassy_backend(scalar backend-scalar
             "-C link-arg=--no-entry -C link-arg=-O1 -C target-feature=-simd128")
         if(DUCKDB_PLATFORM STREQUAL "wasm_eh")

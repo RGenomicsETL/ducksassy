@@ -66,3 +66,25 @@ SELECT CASE WHEN count(*) = 4096 AND bool_and(
          WHEN i % 3 = 0 THEN hits[1].cigar_ops = [135::UINTEGER]
          ELSE hits[1].cigar_ops = [87::UINTEGER, 18, 55] END)
     THEN true ELSE error('packed CIGAR output growth') END FROM outputs;
+
+WITH formats(format) AS (VALUES ('text'), ('packed'), ('both')),
+results AS (
+    SELECT format, hit
+    FROM formats,
+    LATERAL unnest(sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 0,
+        rc := false, cigar_format := format)) AS matches(hit)
+)
+SELECT CASE WHEN count(*) = 3
+    AND bool_and(CASE format
+        WHEN 'text' THEN hit.cigar = '7=' AND hit.cigar_ops IS NULL
+        WHEN 'packed' THEN hit.cigar IS NULL AND hit.cigar_ops = [119::UINTEGER]
+        ELSE hit.cigar = '7=' AND hit.cigar_ops = [119::UINTEGER]
+    END)
+    THEN true ELSE error('CRISPR cigar_format contract') END FROM results;
+
+SELECT CASE WHEN len(sassy_crispr_matches_many(['ACGTNGG', 'ACGTNGG'],
+        'TTACGTAGGTT', 0, rc := false, cigar_format := 'packed')) = 2
+    AND list_transform(sassy_crispr_matches_many(['ACGTNGG', 'ACGTNGG'],
+        'TTACGTAGGTT', 0, rc := false, cigar_format := 'packed'),
+        hit -> hit.cigar_ops) = [[119::UINTEGER], [119::UINTEGER]]
+    THEN true ELSE error('CRISPR panel packed CIGAR') END;

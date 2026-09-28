@@ -13,8 +13,10 @@ local({
   stopifnot(nrow(hits) == 1L, hits$cost <= 1L)
 
   guides <- DBI::dbGetQuery(con, "
-    SELECT len(sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 0)) AS n")
-  stopifnot(as.numeric(guides$n) == 1)
+    SELECT len(sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 0)) AS n,
+           sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 0,
+             3, false, 0.2, false, 'packed')[1].cigar_ops AS cigar_ops")
+  stopifnot(as.numeric(guides$n) == 1, identical(as.numeric(guides$cigar_ops[[1]]), 119))
 
   backends <- DBI::dbGetQuery(con, "SELECT * FROM sassy_backend_info()")
   stopifnot(sum(backends$selected) == 1L)

@@ -46,6 +46,9 @@ for (const variant of variants) {
                     hit.strand, hit.cigar, hit.cigar_ops
                 FROM (SELECT unnest(sassy_matches('ACGA', 'TTCGTT', 0, 'dna', true, false, 'both')) AS hit)`))
                 .toEqual([{ start: 1, stop: 5, strand: '-', cigar: '4=', cigar_ops: [71] }]);
+            expect(await query(`SELECT sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 0,
+                    3, false, 0.2, false, 'packed')[1].cigar_ops AS ops`))
+                .toEqual([{ ops: [119] }]);
             expect(await query(`SELECT sassy_count(NULL, 'ACGT', 0) AS n,
                 sassy_contains('ACGT', NULL, 0) AS found, sassy_matches(NULL, 'ACGT', 0) AS hits`))
                 .toEqual([{ n: null, found: null, hits: null }]);
@@ -68,7 +71,7 @@ for (const variant of variants) {
         }
     });
 
-    test(`${variant}: distribution requires working Rust panic recovery`, async ({ page }, testInfo) => {
+    test(`${variant}: Rust panic invalidates one worker and a fresh worker recovers`, async ({ page }, testInfo) => {
         const messages: string[] = [];
         page.on('console', message => { if (messages.length < 64) messages.push(message.text()); });
         await page.goto('/');
@@ -76,24 +79,26 @@ for (const variant of variants) {
         await page.evaluate(variant => (window as any).startDucksassy(variant), variant);
         await page.evaluate(variant => (window as any).sql(
             `LOAD '${location.origin}/extensions/${variant}/panicprobe.duckdb_extension'`), variant);
-        // Capture only the panic call's failure. Setup/LOAD failures must fail the test.
-        const result = await page.evaluate(async () => {
+        const error = await page.evaluate(async () => {
             try {
-                return { rows: await (window as any).sql('SELECT panicprobe() AS caught'), error: null };
-            } catch (error) {
-                return { rows: null, error: String(error) };
+                await Promise.race([
+                    (window as any).sql('SELECT panicprobe() AS caught'),
+                    new Promise((_, reject) => setTimeout(
+                        () => reject(new Error('panic worker timeout')), 10000)),
+                ]);
+                return '';
+            } catch (failure) {
+                return String(failure);
             }
         });
+        expect(error).not.toBe('');
+        await page.evaluate(() => (window as any).terminateDucksassy());
+        await page.reload();
+        await page.waitForFunction(() => typeof (window as any).startDucksassy === 'function');
+        await page.evaluate(variant => (window as any).startDucksassy(variant), variant);
+        expect(await page.evaluate(async () => (await (window as any).sql(
+            `SELECT sassy_count('ACGT', 'TTACGT', 0, 'dna', false) AS n`))[0].n)).toBe(1);
+        await page.evaluate(async () => (window as any).closeDucksassy());
         await testInfo.attach('panic-console', { body: messages.join('\n'), contentType: 'text/plain' });
-        if (result.error) {
-            await testInfo.attach('panic-recovery-blocker', { body: result.error, contentType: 'text/plain' });
-            console.log(`${variant} excluded: ${result.error}`);
-            expect(manifest.community_extension.extension.excluded_platforms.split(';')).toContain(variant);
-            expect(result.error).toContain(variant === 'wasm_mvp'
-                ? '_setThrew is not defined' : 'Maximum call stack size exceeded');
-        } else {
-            expect(result.rows).toEqual([{ caught: 1 }]);
-        }
-        // A failed unwind invalidates the worker; page teardown terminates it.
     });
 }

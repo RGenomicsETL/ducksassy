@@ -61,6 +61,14 @@ bool search_execute(const search_operation *operation, const search_host *host,
         if (max_edits < 0 || (uint64_t)max_edits > UINT32_MAX) {
             INPUT_ERROR("ducksassy: k must be nonnegative");
         }
+        bool text_cigar = output_hits, packed_cigar = false;
+        if (output_hits) {
+            unsigned argument = crispr ? ARG_CRISPR_CIGAR_FORMAT : ARG_CIGAR_FORMAT;
+            sassy_c_slice format = host->string(context, argument, row);
+            text_cigar = equal_label(format, "text") || equal_label(format, "both");
+            packed_cigar = equal_label(format, "packed") || equal_label(format, "both");
+            if (!text_cigar && !packed_cigar) INPUT_ERROR("ducksassy: cigar_format must be text, packed, or both");
+        }
         uint32_t alphabet = SASSY_C_IUPAC;
         sassy_c_crispr_options crispr_options = {0};
         if (crispr) {
@@ -73,7 +81,8 @@ bool search_execute(const search_operation *operation, const search_host *host,
             crispr_options.struct_size = sizeof(crispr_options);
             crispr_options.pam_length = (uint32_t)pam_length;
             crispr_options.allow_pam_edits = host->boolean(context, ARG_ALLOW_PAM_EDITS, row) ? 1U : 0U;
-            crispr_options.include_cigar = 1;
+            crispr_options.include_cigar = (text_cigar ? SASSY_C_INCLUDE_TEXT_CIGAR : 0U) |
+                                           (packed_cigar ? SASSY_C_INCLUDE_PACKED_CIGAR : 0U);
             crispr_options.max_n_frac = (float)max_n_fraction;
         } else {
             sassy_c_slice label = host->string(context, ARG_ALPHABET, row);
@@ -86,13 +95,6 @@ bool search_execute(const search_operation *operation, const search_host *host,
         sassy_c_searcher **searcher = &worker->searchers[alphabet][reverse_complement];
         if (!*searcher && sassy_c_searcher_new(alphabet, reverse_complement, searcher) != SASSY_C_OK) {
             INPUT_ERROR(sassy_c_last_error());
-        }
-        bool text_cigar = output_hits, packed_cigar = false;
-        if (operation->kind == OP_MATCHES) {
-            sassy_c_slice format = host->string(context, ARG_CIGAR_FORMAT, row);
-            text_cigar = equal_label(format, "text") || equal_label(format, "both");
-            packed_cigar = equal_label(format, "packed") || equal_label(format, "both");
-            if (!text_cigar && !packed_cigar) INPUT_ERROR("ducksassy: cigar_format must be text, packed, or both");
         }
         sassy_c_options options = {
             .struct_size = sizeof(options),

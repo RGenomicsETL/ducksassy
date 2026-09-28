@@ -16,6 +16,7 @@ window.startDucksassy = async (variant) => {
     window.closeDucksassy = async () => {
         await conn.close(); await db.reset(); await db.terminate(); worker.terminate();
     };
+    window.terminateDucksassy = () => worker.terminate();
     const version = await window.sql('PRAGMA version');
     const platform = await window.sql('PRAGMA platform');
     console.log('Host identity', JSON.stringify({ version, platform }));

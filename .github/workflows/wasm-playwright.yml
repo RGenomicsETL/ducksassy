@@ -49,7 +49,7 @@ jobs:
           npm ci --prefix .deps-port/wasm-node --no-audit --no-fund
           .deps-port/wasm-node/node_modules/.bin/playwright install --with-deps chromium
       - name: SQL examples and panic-ABI distribution gate
-        # MVP/EH remain excluded while their panic probes fail recovery.
+        # MVP/EH use a fail-stop panic ABI; a fresh worker must recover.
         run: make wasm-playwright-test
       - uses: actions/upload-artifact@v4
         if: always()

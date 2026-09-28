@@ -21,10 +21,10 @@ CREATE TEMP MACRO sassy_contains_many_opts(patterns, text, k,
     alphabet := 'iupac', rc := true, all_endpoints := false) AS
     sassy_contains_many(patterns, text, k::BIGINT, alphabet::VARCHAR, rc::BOOLEAN, all_endpoints::BOOLEAN);
 CREATE TEMP MACRO sassy_crispr_matches_opts(guide, text, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS
     sassy_crispr_matches(guide, text, k::BIGINT, pam_length::BIGINT,
-        allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE, rc::BOOLEAN);
+        allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE, rc::BOOLEAN, cigar_format::VARCHAR);
 CREATE TEMP MACRO sassy_crispr_matches_many_opts(guides, text, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS
     sassy_crispr_matches_many(guides, text, k::BIGINT, pam_length::BIGINT,
-        allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE, rc::BOOLEAN);
+        allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE, rc::BOOLEAN, cigar_format::VARCHAR);

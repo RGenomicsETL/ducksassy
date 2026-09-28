@@ -89,6 +89,7 @@ def main():
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, max_n_frac := -0.1);", 'max_n_frac'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, max_n_frac := 1.0000000001);", 'max_n_frac'),
             ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, max_n_frac := 'NaN'::DOUBLE);", 'max_n_frac'),
+            ("SELECT sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, cigar_format := 'legacy');", 'text, packed, or both'),
             ("SELECT sassy_crispr_matches_many(['ACGTNGG', 'ACGTNGA'], 'ACGTAGG', 0);", 'identical PAM'),
             ("SELECT sassy_crispr_matches_many(['ACGTNGG', NULL], 'ACGTAGG', 0);", 'NULL elements'),
         ]

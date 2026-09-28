@@ -4,9 +4,9 @@ SELECT CASE WHEN count(*) = 10 AND bool_and(function_type IN ('scalar', 'table')
 FROM (SELECT DISTINCT function_name, function_type, internal FROM duckdb_functions()
       WHERE function_name LIKE 'sassy_%');
 SELECT CASE WHEN count(*) = 2 AND bool_and(parameter_types[3:] =
-    ['BIGINT', 'BIGINT', 'BOOLEAN', 'DOUBLE', 'BOOLEAN'])
+    ['BIGINT', 'BIGINT', 'BOOLEAN', 'DOUBLE', 'BOOLEAN', 'VARCHAR'])
     THEN true ELSE error('native CRISPR positional contract') END
-FROM duckdb_functions() WHERE function_name = 'sassy_crispr_matches' AND len(parameter_types) = 7;
+FROM duckdb_functions() WHERE function_name = 'sassy_crispr_matches' AND len(parameter_types) = 8;
 SELECT CASE WHEN count(*) = 0 THEN true ELSE error('loader macro DDL') END
 FROM duckdb_functions() WHERE function_name LIKE '%sassy%' AND function_type LIKE '%macro%';
 
@@ -25,8 +25,12 @@ SELECT CASE WHEN sassy_count('ACGA', 'TTACGA', 0) = 1
     AND sassy_count('ACGA', 'ACGA', NULL) IS NULL
     THEN true ELSE error('native defaults, panel or NULL') END;
 SELECT CASE WHEN len(sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0)) = 1
+    AND sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0)[1].cigar_ops IS NULL
     AND len(sassy_crispr_matches_many(['ACGTNGG']::BLOB[], 'ACGTAGG'::BLOB, 0)) = 1
-    AND len(sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, 3, false, 0.2, false)) = 1
+    AND sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, 3, false, 0.2, false,
+                             'packed')[1].cigar IS NULL
+    AND sassy_crispr_matches('ACGTNGG', 'ACGTAGG', 0, 3, false, 0.2, false,
+                             'packed')[1].cigar_ops = [119::UINTEGER]
     THEN true ELSE error('native CRISPR defaults') END;
 SELECT CASE WHEN sassy_count('a' || chr(0) || 'b', 'xa' || chr(0) || 'by', 0, 'ascii', false) = 1
     AND (SELECT count(*) FROM sassy_grep('a' || chr(0) || 'b', 'xa' || chr(0) || 'by', 0)) = 1
