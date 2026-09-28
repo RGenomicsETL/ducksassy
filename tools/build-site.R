@@ -6,7 +6,7 @@ pkgdown::build_site("r/Rducksassy", examples = FALSE, new_process = FALSE,
                     install = FALSE, preview = FALSE)
 
 reports <- sort(list.files("benchmarks", pattern = "\\.md$", full.names = TRUE))
-sources <- c("README.md", reports, "docs/v1-host.md")
+sources <- c("README.md", reports, "docs/v1-host.md", "docs/functions.md")
 outputs <- c("index.html", sub("\\.md$", ".html", sources[-1L]))
 names(outputs) <- normalizePath(sources, winslash = "/", mustWork = TRUE)
 header <- readLines("tools/landing-header.html", warn = FALSE)

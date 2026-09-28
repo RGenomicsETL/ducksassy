@@ -1,6 +1,8 @@
 #include "duckdb_extension.h"
 #include "ducksassy_core.h"
-#ifdef _WIN32
+#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+#define SASSY_SINGLE_THREADED
+#elif defined(_WIN32)
 #include <windows.h>
 #else
 #include <pthread.h>
@@ -18,7 +20,9 @@ typedef struct worker_node {
 } worker_node;
 typedef struct {
     const search_operation *operation;
-#ifdef _WIN32
+#ifdef SASSY_SINGLE_THREADED
+    search_worker *worker;
+#elif defined(_WIN32)
     DWORD key;
     SRWLOCK mutex;
 #else
@@ -52,7 +56,7 @@ static void function_destroy(void *pointer) {
     function_data *data = pointer;
 #ifdef _WIN32
     TlsFree(data->key);
-#else
+#elif !defined(SASSY_SINGLE_THREADED)
     pthread_key_delete(data->key);
 #endif
     worker_node *node = data->workers;
@@ -62,7 +66,7 @@ static void function_destroy(void *pointer) {
         free(node);
         node = next;
     }
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(SASSY_SINGLE_THREADED)
     pthread_mutex_destroy(&data->mutex);
 #endif
     free(data);
@@ -73,7 +77,9 @@ static void input_error(void *pointer, const char *message) {
 static search_worker *input_worker(void *pointer) {
     scalar_context *context = pointer;
     function_data *data = context->function;
-#ifdef _WIN32
+#ifdef SASSY_SINGLE_THREADED
+    search_worker *worker = data->worker;
+#elif defined(_WIN32)
     search_worker *worker = TlsGetValue(data->key);
 #else
     search_worker *worker = pthread_getspecific(data->key);
@@ -87,7 +93,10 @@ static search_worker *input_worker(void *pointer) {
         input_error(context, "ducksassy: thread worker allocation failed");
         return NULL;
     }
-#ifdef _WIN32
+#ifdef SASSY_SINGLE_THREADED
+    data->worker = worker;
+    bool stored = true;
+#elif defined(_WIN32)
     bool stored = TlsSetValue(data->key, worker) != 0;
 #else
     bool stored = pthread_setspecific(data->key, worker) == 0;
@@ -101,14 +110,14 @@ static search_worker *input_worker(void *pointer) {
     node->worker = worker;
 #ifdef _WIN32
     AcquireSRWLockExclusive(&data->mutex);
-#else
+#elif !defined(SASSY_SINGLE_THREADED)
     pthread_mutex_lock(&data->mutex);
 #endif
     node->next = data->workers;
     data->workers = node;
 #ifdef _WIN32
     ReleaseSRWLockExclusive(&data->mutex);
-#else
+#elif !defined(SASSY_SINGLE_THREADED)
     pthread_mutex_unlock(&data->mutex);
 #endif
     return worker;
@@ -300,7 +309,7 @@ static bool add_operation(duckdb_scalar_function_set set, const search_operation
     data->key = TlsAlloc();
     if (data->key == TLS_OUT_OF_INDEXES) { free(data); return false; }
     InitializeSRWLock(&data->mutex);
-#else
+#elif !defined(SASSY_SINGLE_THREADED)
     if (pthread_key_create(&data->key, NULL) != 0) { free(data); return false; }
     if (pthread_mutex_init(&data->mutex, NULL) != 0) {
         pthread_key_delete(data->key);

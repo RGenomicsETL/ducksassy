@@ -1,0 +1,13 @@
+{
+  "name": "ducksassy-wasm-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@duckdb/duckdb-wasm": "1.33.1-dev64.0",
+    "@playwright/test": "1.61.1",
+    "esbuild": "0.25.12"
+  }
+}
