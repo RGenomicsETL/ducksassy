@@ -66,6 +66,8 @@ jobs:
       ci_tools_version: v1.5.5
       extra_toolchains: rust;python3
       reduced_ci_mode: disabled
-      # Windows lacks CMake archive/link/metadata support. Wasm's Rust backend
-      # is type-checked separately but has no complete extension build here.
-      exclude_archs: 'windows_amd64;windows_amd64_mingw;windows_amd64_rtools;windows_arm64;wasm_mvp;wasm_eh;wasm_threads'
+      # MSVC is unsupported. Rust 1.91's Emscripten std uses JS-based EH:
+      # MVP panic recovery fails with missing _setThrew; native-EH recovery aborts.
+      # Threads also fail --shared-memory: prebuilt compiler_builtins lacks atomics.
+      # See docs/v1-host.md and the browser panic-ABI probes before enabling Wasm.
+      exclude_archs: 'windows_amd64;windows_arm64;wasm_mvp;wasm_eh;wasm_threads'

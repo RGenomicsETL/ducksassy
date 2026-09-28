@@ -6,7 +6,14 @@
 /rust/target/
 /.deps/
 /.deps-v1/
+/.deps-port/
+/test/wasm/node_modules
+/test/wasm/test-results/
+/test/wasm/playwright-report/
+/HANDOFF*.md
 /build-v1/
+/build-mingw/
+/build-rtools/
 /build-v2/
 /build-baseline/
 /.pi/

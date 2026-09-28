@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # OS_type: unix; CMake has no Windows archive/link implementation.
+        # Rducksassy's v2 preview package declares OS_type: unix.
         os: [ubuntu-latest, macos-latest]
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}

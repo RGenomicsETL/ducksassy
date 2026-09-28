@@ -8,7 +8,7 @@
       "build": "cmake",
       "license": "GPL-2.0-or-later",
       "requires_toolchains": "rust;python3",
-      "excluded_platforms": "windows_amd64;windows_amd64_mingw;windows_amd64_rtools;windows_arm64;wasm_mvp;wasm_eh;wasm_threads",
+      "excluded_platforms": "windows_amd64;windows_arm64;wasm_mvp;wasm_eh;wasm_threads",
       "maintainers": [
         "sounkou-bioinfo"
       ]
@@ -43,7 +43,7 @@
         "Coordinates are zero-based and half-open in the input text. Text CIGAR is in pattern direction on reverse-strand hits; packed `cigar_ops` use BAM encoding in forward-reference order with query soft clips.",
         "`sassy_grep` streams one long ASCII value in overlapping 1 KiB regions and returns all qualifying endpoints, so an outer `LIMIT` stops the search early.",
         "The SIMD backend (scalar, AVX2, AVX-512 or NEON) is chosen at runtime; set `SASSY_C_BACKEND` before the first search to force one. `sassy_backend_info()` reports what is compiled, supported and selected.",
-        "Loading executes no SQL and writes nothing to the database, so read-only databases are supported. Windows and WebAssembly builds are not yet provided."
+        "Loading executes no SQL and writes nothing to the database, so read-only databases are supported. MinGW and Rtools x86-64 builds use static Rust/GCC runtimes and Windows system DLLs. MSVC is unsupported. WebAssembly remains excluded: the scalar MVP/EH modules pass SQL smoke tests but cannot recover Rust panics with the pinned prebuilt std; shared-memory builds also require an atomics-enabled std."
       ]
     }
   },
