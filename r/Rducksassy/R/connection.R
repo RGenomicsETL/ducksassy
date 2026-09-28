@@ -54,11 +54,15 @@ rducksassy_connect <- function(dbdir = ":memory:", read_only = FALSE,
 #' rducksassy_load(con)
 #' DBI::dbDisconnect(con, shutdown = TRUE)
 rducksassy_load <- function(con) {
-  extension <- system.file(
-    "libs", "ducksassy.duckdb_extension",
-    package = "Rducksassy",
-    mustWork = TRUE
+  extension <- list.files(
+    system.file("libs", package = "Rducksassy", mustWork = TRUE),
+    pattern = "^ducksassy[.]duckdb_extension$",
+    full.names = TRUE,
+    recursive = TRUE
   )
+  if (length(extension) != 1L) {
+    stop("Could not locate the packaged Ducksassy extension.", call. = FALSE)
+  }
   DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con, extension)))
   invisible(con)
 }
