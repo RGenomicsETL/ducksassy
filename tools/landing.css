@@ -1,12 +1,77 @@
-:root { color-scheme: light; }
-body { color: #203b3a; font-family: system-ui, sans-serif; max-width: 58rem; }
-a { color: #17675c; }
-h1, h2, h3 { color: #144e46; letter-spacing: -0.02em; }
-h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); }
-p, li { line-height: 1.7; }
-pre { border: 1px solid #dbe8e5; border-radius: 0.5rem; background: #f5f9f8; overflow-x: auto; }
-blockquote { border-left: 3px solid #17675c; margin-left: 0; padding-left: 1rem; color: #33504e; }
-.landing-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem 1.2rem; padding: 1rem 0; border-bottom: 1px solid #dbe8e5; }
-.landing-nav a { font-size: 0.9rem; text-decoration: none; }
-.landing-nav .brand { font-size: 1.1rem; font-weight: 700; margin-right: auto; }
-@media (max-width: 40rem) { .landing-nav .brand { flex-basis: 100%; } }
+:root {
+  --site-green: #17675c;
+  --site-green-dark: #144e46;
+  --site-line: #dbe8e5;
+  --site-surface: #f5f9f8;
+}
+
+body {
+  max-width: 1120px;
+}
+
+nav > p {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+}
+
+nav .project-home {
+  color: var(--site-green-dark);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.frontmatter .title h1 {
+  color: var(--site-green-dark);
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  letter-spacing: -0.04em;
+  margin: 0.35em 0;
+}
+
+.body {
+  padding: clamp(1rem, 3vw, 2.5rem);
+}
+
+a,
+a:visited {
+  color: var(--site-green);
+}
+
+pre > code {
+  background: var(--site-surface);
+  border: 1px solid var(--site-line);
+  border-radius: 0.35rem;
+  white-space: pre;
+}
+
+table {
+  border-color: var(--site-line);
+  width: 100%;
+}
+
+thead th {
+  text-align: left;
+}
+
+tbody td:first-child strong {
+  color: var(--site-green);
+  font-family: "DejaVu Sans Mono", "Droid Sans Mono", Consolas, monospace;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  body {
+    padding: 0.75rem;
+  }
+
+  nav > p {
+    flex-wrap: wrap;
+  }
+
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}

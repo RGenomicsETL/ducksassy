@@ -2,26 +2,26 @@
 % Please edit documentation in R/connection.R
 \name{rducksassy_load}
 \alias{rducksassy_load}
-\title{Load Ducksassy and its SQL bindings}
+\title{Load Ducksassy into a DuckDB connection}
 \usage{
 rducksassy_load(con)
 }
 \arguments{
-\item{con}{An existing DuckDB DBI connection with C API v2 support.}
+\item{con}{A DuckDB DBI connection.}
 }
 \value{
-Invisibly, the supplied connection.
+\code{con}, invisibly.
 }
 \description{
-Loads the package-built DuckHTS and Ducksassy extensions into an existing
-DuckDB connection. The host must support C API v2 and permit unsigned extensions.
-Install the suggested \code{Rduckhts} package to supply its extension files;
-its R namespace is not loaded.
+Loads the extension bundled with Rducksassy into an existing compatible
+DuckDB DBI connection.
 }
-\details{
-The C API v2 preview is not stable between DuckDB engine commits, so the
-extension only loads into the engines it was built for. Other engines raise
-an error of class \code{rducksassy_incompatible_host}. Set
-\code{options(Rducksassy.allow_untested_host = TRUE)} to load anyway, at the
-risk of crashing the R session.
+\examples{
+driver <- duckdb::duckdb(
+  config = list(allow_unsigned_extensions = "true"),
+  shared_home = FALSE
+)
+con <- DBI::dbConnect(driver)
+rducksassy_load(con)
+DBI::dbDisconnect(con, shutdown = TRUE)
 }

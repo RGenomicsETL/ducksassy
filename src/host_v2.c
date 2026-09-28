@@ -336,7 +336,7 @@ static void scalar_exec(duckdb_v2_scalar_function_exec_info_handle info,
     }
     bool crispr = operation->kind == OP_CRISPR;
     bool output_hits = operation->kind == OP_MATCHES || crispr;
-    hits.extended = operation->kind == OP_MATCHES;
+    hits.extended = operation->kind == OP_MATCHES || crispr;
     uint32_t argument_count = crispr ? CRISPR_ARGUMENT_COUNT :
         hits.extended ? SEARCH_ARGUMENT_COUNT : SEARCH_BASE_ARGUMENT_COUNT;
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &row_count, &detail));
@@ -420,9 +420,11 @@ static bool register_operation(duckdb_v2_extension_handle extension,
     if (operation->kind == OP_CRISPR) {
         argument_count = CRISPR_ARGUMENT_COUNT;
         types[ARG_PAM_LENGTH] = "BIGINT";
+        types[ARG_CRISPR_CIGAR_FORMAT] = "VARCHAR";
         names[ARG_PATTERN] = "guide";
         names[ARG_PAM_LENGTH] = "pam_length";
         names[ARG_ALLOW_PAM_EDITS] = "allow_pam_edits";
+        names[ARG_CRISPR_CIGAR_FORMAT] = "cigar_format";
     }
     for (uint32_t argument = 0; argument < argument_count; ++argument) {
         DUCKDB_CALL(duckdb_v2_context_create_type_from_text(context, string_view(types[argument]),
@@ -434,7 +436,7 @@ static bool register_operation(duckdb_v2_extension_handle extension,
     const char *return_type = "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, "
                               "pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand "
                               "VARCHAR, cigar VARCHAR)[]";
-    if (operation->kind == OP_MATCHES) {
+    if (operation->kind == OP_MATCHES || operation->kind == OP_CRISPR) {
         return_type = "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, "
                       "pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand "
                       "VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]";

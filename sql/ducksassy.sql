@@ -33,14 +33,16 @@ CREATE OR REPLACE TEMP MACRO sassy_contains_many(patterns, text, k,
         all_endpoints::BOOLEAN);
 
 CREATE OR REPLACE TEMP MACRO sassy_crispr_matches(guide, text, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS
     __sassy_crispr_matches(guide, text, k::BIGINT, pam_length::BIGINT,
-                           rc::BOOLEAN, allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE);
+                           rc::BOOLEAN, allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE,
+                           cigar_format::VARCHAR);
 
 CREATE OR REPLACE TEMP MACRO sassy_crispr_matches_many(guides, text, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS
     __sassy_crispr_matches_many(guides, text, k::BIGINT, pam_length::BIGINT,
-                                rc::BOOLEAN, allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE);
+                                rc::BOOLEAN, allow_pam_edits::BOOLEAN, max_n_frac::DOUBLE,
+                                cigar_format::VARCHAR);
 
 CREATE OR REPLACE TEMP MACRO sassy_search_fasta(path, pattern, k, alphabet := 'dna', rc := true,
     all_endpoints := false, cigar_format := 'text') AS TABLE
@@ -55,15 +57,17 @@ CREATE OR REPLACE TEMP MACRO sassy_panel_search_fasta(path, patterns, k, alphabe
     FROM read_fasta(path, scan_mode := 'sequential') r;
 
 CREATE OR REPLACE TEMP MACRO sassy_crispr_search_fasta(path, guide, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS TABLE
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS TABLE
     SELECT r.*, unnest(sassy_crispr_matches(guide, r.sequence, k, pam_length := pam_length,
-        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc)) AS hit
+        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc,
+        cigar_format := cigar_format)) AS hit
     FROM read_fasta(path, scan_mode := 'sequential') r;
 
 CREATE OR REPLACE TEMP MACRO sassy_crispr_panel_search_fasta(path, guides, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS TABLE
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS TABLE
     SELECT r.*, unnest(sassy_crispr_matches_many(guides, r.sequence, k, pam_length := pam_length,
-        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc)) AS hit
+        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc,
+        cigar_format := cigar_format)) AS hit
     FROM read_fasta(path, scan_mode := 'sequential') r;
 
 CREATE OR REPLACE TEMP MACRO sassy_search_fastq(path, pattern, k,
@@ -83,15 +87,17 @@ CREATE OR REPLACE TEMP MACRO sassy_panel_search_fastq(path, patterns, k,
 -- The named input table/view must expose a sequence column. All other columns
 -- are preserved, so caller-supplied read/sample/locus identifiers remain intact.
 CREATE OR REPLACE TEMP MACRO sassy_crispr_search_table(t, guide, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS TABLE
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS TABLE
     SELECT r.*, unnest(sassy_crispr_matches(guide, r.sequence, k, pam_length := pam_length,
-        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc)) AS hit
+        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc,
+        cigar_format := cigar_format)) AS hit
     FROM query_table(t) r;
 
 CREATE OR REPLACE TEMP MACRO sassy_crispr_panel_search_table(t, guides, k, pam_length := 3,
-    allow_pam_edits := false, max_n_frac := 0.2, rc := true) AS TABLE
+    allow_pam_edits := false, max_n_frac := 0.2, rc := true, cigar_format := 'text') AS TABLE
     SELECT r.*, unnest(sassy_crispr_matches_many(guides, r.sequence, k, pam_length := pam_length,
-        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc)) AS hit
+        allow_pam_edits := allow_pam_edits, max_n_frac := max_n_frac, rc := rc,
+        cigar_format := cigar_format)) AS hit
     FROM query_table(t) r;
 
 CREATE OR REPLACE TEMP MACRO sassy_search_table(input_table, pattern, k,

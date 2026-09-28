@@ -20,8 +20,8 @@ Scalar options are positional: the stable C extension API has no named scalar ar
 
 | Function | Kind | Description |
 | --- | --- | --- |
-| [`sassy_crispr_matches`](#sassy_crispr_matches) | scalar | Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default. |
-| [`sassy_crispr_matches_many`](#sassy_crispr_matches_many) | scalar | Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls. |
+| [`sassy_crispr_matches`](#sassy_crispr_matches) | scalar | Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default. `cigar_format` selects text, packed BAM operations, or both. |
+| [`sassy_crispr_matches_many`](#sassy_crispr_matches_many) | scalar | Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls. `cigar_format` selects text, packed BAM operations, or both. |
 
 ## Diagnostics
 
@@ -221,19 +221,19 @@ SELECT text_start FROM sassy_grep('error', 'error: ' || repeat('ready ', 100000)
 
 ### sassy_crispr_matches
 
-Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default.
+Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default. `cigar_format` selects text, packed BAM operations, or both.
 
 Signature:
 
 ```sql
-sassy_crispr_matches(guide, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])
--- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true
+sassy_crispr_matches(guide, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc[, cigar_format]]]]])
+-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true, cigar_format = 'text'
 ```
 
 Returns:
 
 ```
-STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]
+STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]
 ```
 
 Examples:
@@ -246,19 +246,19 @@ SELECT unnest(sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 1), recursive := tr
 
 ### sassy_crispr_matches_many
 
-Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls.
+Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls. `cigar_format` selects text, packed BAM operations, or both.
 
 Signature:
 
 ```sql
-sassy_crispr_matches_many(guides, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])
--- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true
+sassy_crispr_matches_many(guides, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc[, cigar_format]]]]])
+-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true, cigar_format = 'text'
 ```
 
 Returns:
 
 ```
-STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]
+STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]
 ```
 
 Examples:

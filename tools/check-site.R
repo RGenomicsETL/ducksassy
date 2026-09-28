@@ -2,8 +2,16 @@
 # Every local page, asset and fragment must resolve within the generated site.
 files <- list.files("site", pattern = "\\.html$", recursive = TRUE, full.names = TRUE)
 stopifnot(length(files) > 0L)
+landing <- xml2::read_html(file.path("site", "index.html"))
+landing_title <- xml2::xml_text(xml2::xml_find_all(landing, "//div[contains(@class, 'frontmatter')]//h1"))
+stopifnot(identical(landing_title, "ducksassy"))
 for (file in files) {
   page <- xml2::read_html(file)
+  frontmatter <- xml2::xml_find_all(page, "//div[contains(@class, 'frontmatter')]")
+  if (length(frontmatter) == 1L) {
+    stopifnot(length(xml2::xml_find_all(frontmatter, ".//h1")) == 1L,
+              length(xml2::xml_find_all(page, "//div[contains(@class, 'body')]/h1")) == 0L)
+  }
   nodes <- xml2::xml_find_all(page, "//*[@href or @src]")
   links <- unique(na.omit(c(xml2::xml_attr(nodes, "href"), xml2::xml_attr(nodes, "src"))))
   links <- links[!grepl("^([[:alpha:]][[:alnum:]+.-]*:|//)", links)]

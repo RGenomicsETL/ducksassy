@@ -1,13 +1,16 @@
-This development package targets R-universe. The extension requires DuckDB C
-API v2 at runtime. It builds from bundled headers without loading or linking
-an R DuckDB host. The optional duckdb.2.0.dev Suggests dependency supplies a
-compatible test host; it is not needed to build or install the package. A CRAN
-submission still needs a compatible released host. DuckDB 1.5.5 supports only
-C API v1; the search tests report this specific incompatibility and skip when
-no v2 host is installed. Other load failures fail the tests.
+## Test environment
 
-R CMD check reports an unused-import NOTE for Rduckhts. It is a required native
-resource dependency: `system.file(package = "Rduckhts")` locates the extension
-built by that package. Loading its R namespace loads the stable duckdb driver,
-whose methods can conflict with another DuckDB driver chosen by the caller,
-so Rducksassy loads the native extension directly.
+- Ubuntu 24.04.3 LTS, R-devel 4.6.0, x86_64
+
+## R CMD check results
+
+0 errors | 0 warnings | 1 note
+
+The note identifies this package as a new submission.
+
+## Native sources
+
+The source package contains locked, vendored Rust dependencies and builds
+without network access. Configuration reports and requires Cargo and rustc >=
+1.91, limits Cargo to two build jobs, and records dependency copyright and
+license notices in `inst/LICENCE.note`.

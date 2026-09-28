@@ -96,8 +96,7 @@ Download the CLI separately as described in
 [host architecture, setup and measurements](docs/v1-host.md). Every v1 function,
 with signatures and examples, is listed in the [function reference](docs/functions.md).
 V1 `LOAD` writes no catalog entries and works on a read-only database.
-Scalars use positional trailing options: `alphabet, rc, all_endpoints, cigar_format` for matches, and `pam_length, allow_pam_edits, max_n_frac, rc`
-for CRISPR. Defaults and VARCHAR/BLOB support match v2. V1 has no file or
+Scalars use positional trailing options: `alphabet, rc, all_endpoints, cigar_format` for matches, and `pam_length, allow_pam_edits, max_n_frac, rc, cigar_format` for CRISPR. Defaults and VARCHAR/BLOB support match v2. V1 has no file or
 relation-name helpers; compose native calls with a table, CTE or explicitly
 loaded DuckHTS reader:
 
@@ -115,10 +114,13 @@ Use `read_fastq(...)` for reads, `_many` with a pattern list for panels, or
 `DUCKSASSY_HOST=v1`; standalone CMake defaults to `v2`. Keep their build directories separate.
 Distribution CI uses `make configure release test_release`, which produces the
 v1 artifact under `build/release/`; see the [CI contract](docs/v1-host.md#distribution-and-ci).
-The distribution matrix covers Linux and macOS x86-64/ARM64, plus Windows x86-64
-MinGW and Rtools. MSVC is unsupported. Wasm MVP/EH pass browser SQL probes but
-remain excluded because Rust panic recovery fails; Wasm threads also require
-an atomics-enabled Rust standard library. See the [portable build evidence](docs/v1-host.md#portable-builds).
+The distribution matrix covers Linux and macOS x86-64/ARM64, Windows x86-64
+MinGW/Rtools, and the default DuckDB-Wasm MVP/EH bundles. MSVC is unsupported.
+Wasm uses scalar search and a fail-stop Rust panic ABI: an internal panic
+invalidates that worker, which the caller terminates before starting a fresh
+worker that can load and query the extension. The optional
+COI/threads bundle requires an atomics-enabled Rust standard library. See the
+[portable build evidence](docs/v1-host.md#portable-builds).
 
 ### Pinned C API v2 host
 
@@ -152,24 +154,19 @@ outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
 
 ### R package
 
-[`Rducksassy`](r/Rducksassy/README.md) builds the extension from bundled sources
-and provides `rducksassy_connect()` and `rducksassy_load()`. It requires
-a DuckDB host with C API v2 support and the extension bundled by `Rduckhts`.
-Its examples include searching BAM read sequences while retaining alignment
-identifiers for SQL joins and summaries.
+[`Rducksassy`](r/Rducksassy/README.md) builds the stable C API v1 extension
+from bundled sources and provides `rducksassy_connect()` and
+`rducksassy_load()` for the CRAN `duckdb` package.
 
 ``` r
-install.packages(c("Rducksassy", "Rduckhts"), repos = c(
-  "https://rgenomicsetl.r-universe.dev",
-  "https://duckdb.r-universe.dev",
-  "https://cloud.r-project.org"
-))
-# One available C API v2 host; other compatible drivers can be supplied.
-install.packages("duckdb.2.0.dev", repos = "https://duckdb.r-universe.dev")
-con <- Rducksassy::rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
+install.packages("Rducksassy")
+con <- Rducksassy::rducksassy_connect()
 DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
 DBI::dbDisconnect(con, shutdown = TRUE)
 ```
+
+Install and load the signed DuckHTS community extension when FASTA, FASTQ or BAM
+readers are needed; the Ducksassy scalar functions accept its sequence columns.
 
 `make vendor-rust` refreshes the shared Rust source archive using the committed
 lockfile. Native and R package builds use it offline. `make r-package` stages
@@ -366,9 +363,9 @@ skip building CIGAR strings.
 
 ### Packed CIGAR
 
-Set `cigar_format := 'packed'` on `sassy_matches` or `sassy_matches_many`
-for typed `cigar_ops UINTEGER[]` without formatting text CIGAR (`cigar` is
-NULL). Set `cigar_format := 'both'` for both representations. The default
+Set `cigar_format := 'packed'` on the general or CRISPR match functions for
+typed `cigar_ops UINTEGER[]` without formatting text CIGAR (`cigar` is NULL).
+Set `cigar_format := 'both'` for both representations. The default
 `'text'` returns text CIGAR and NULL `cigar_ops`. All formats share a fixed
 result struct with both nullable fields. Packed ops include soft clips for
 any partial pattern coverage returned by the search.
@@ -514,10 +511,10 @@ fresh process.
 `scalar` follows Sassy’s baseline and includes SSE2 on x86-64; SSE4.1 has no
 separate tier. Linux x86-64 baseline and AVX2 are tested; AVX-512 is compiled
 but unexecuted, and aarch64/NEON is unverified here. Windows MinGW selects AVX2
-under Wine with DuckDB R 1.5.5. Emscripten MVP/EH probes use only `scalar`;
-`wasm128` is reserved for the threaded build. Browser SQL tests verify the
-scalar catalog and examples, but Wasm distribution is blocked by Rust’s
-exception/shared-memory compatibility; see [the platform checks](docs/v1-host.md#portable-builds).
+under Wine with DuckDB R 1.5.5. Emscripten MVP/EH builds use only `scalar`;
+`wasm128` is reserved for the optional threaded build. Browser tests gate the
+scalar catalog, examples, CRISPR packed CIGAR, invalid-input recovery and
+worker restart after an internal Rust panic; see [the platform checks](docs/v1-host.md#portable-builds).
 
 </details>
 <details>

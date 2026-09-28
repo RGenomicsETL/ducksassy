@@ -9,6 +9,8 @@ use std::{ptr, slice};
 
 const BACKEND_TABLE_VERSION: u32 = 2;
 const PACKED_CIGAR: u32 = 1;
+const INCLUDE_TEXT_CIGAR: u32 = 1;
+const INCLUDE_PACKED_CIGAR: u32 = 2;
 const MAX_BAM_RUN: u32 = (1 << 28) - 1;
 const MAX_PATTERNS: usize = 4096;
 const MAX_PATTERN_BYTES: usize = 4096;
@@ -483,6 +485,7 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
         if opts.struct_size as usize != std::mem::size_of::<SassyCrisprOptions>()
             || opts.pam_length == 0
             || opts.allow_pam_edits > 1
+            || opts.include_cigar & !(INCLUDE_TEXT_CIGAR | INCLUDE_PACKED_CIGAR) != 0
             || !(0.0..=1.0).contains(&opts.max_n_frac)
         {
             return Err(invalid("invalid CRISPR options, PAM length, or N fraction"));
@@ -490,8 +493,12 @@ unsafe extern "C" fn sassy_c_crispr_search_many(
         let common = SassyOptions {
             struct_size: std::mem::size_of::<SassyOptions>() as u32,
             all_endpoints: 1,
-            include_cigar: opts.include_cigar,
-            reserved: 0,
+            include_cigar: u32::from(opts.include_cigar & INCLUDE_TEXT_CIGAR != 0),
+            reserved: if opts.include_cigar & INCLUDE_PACKED_CIGAR != 0 {
+                PACKED_CIGAR
+            } else {
+                0
+            },
         };
         let (state, guides, text) =
             unsafe { search_inputs(searcher, guides, guide_count, text, k, &common)? };
@@ -1222,6 +1229,9 @@ mod tests {
         opts.pam_length = 0;
         assert_eq!(run_crispr(0, &[b"ACGTNGG"], b"ACGTAGG", 0, opts).0, INVALID);
         opts.pam_length = 8;
+        assert_eq!(run_crispr(0, &[b"ACGTNGG"], b"ACGTAGG", 0, opts).0, INVALID);
+        opts = crispr_options();
+        opts.include_cigar = 4;
         assert_eq!(run_crispr(0, &[b"ACGTNGG"], b"ACGTAGG", 0, opts).0, INVALID);
         for value in [-1.0, 2.0, f32::NAN, f32::INFINITY] {
             opts = crispr_options();

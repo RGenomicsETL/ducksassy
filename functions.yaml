@@ -8,7 +8,7 @@
       "build": "cmake",
       "license": "GPL-2.0-or-later",
       "requires_toolchains": "rust;python3",
-      "excluded_platforms": "windows_amd64;windows_arm64;wasm_mvp;wasm_eh;wasm_threads",
+      "excluded_platforms": "windows_amd64;windows_arm64;wasm_threads",
       "maintainers": [
         "sounkou-bioinfo"
       ]
@@ -40,10 +40,10 @@
       "feature_notes": [
         "Scalar arguments are positional with trailing defaults; the C extension API does not support named scalar arguments. For example `sassy_matches(pattern, text, k, alphabet := 'iupac', rc := true, all_endpoints := false, cigar_format := 'text')` is written `sassy_matches(pattern, text, k, 'iupac', true, false, 'text')`, and trailing arguments may be omitted.",
         "Every scalar has VARCHAR and BLOB overloads; pattern and text must use the same type. `_many` variants take a `VARCHAR[]` or `BLOB[]` panel and report the zero-based `pattern_idx` of each hit.",
-        "Coordinates are zero-based and half-open in the input text. Text CIGAR is in pattern direction on reverse-strand hits; packed `cigar_ops` use BAM encoding in forward-reference order with query soft clips.",
+        "Coordinates are zero-based and half-open in the input text. Text CIGAR is in pattern direction on reverse-strand hits; packed `cigar_ops` use BAM encoding in forward-reference order with query soft clips. The result struct is fixed across formats: 'text' sets `cigar_ops` to NULL, 'packed' sets `cigar` to NULL, and 'both' populates both fields.",
         "`sassy_grep` streams one long ASCII value in overlapping 1 KiB regions and returns all qualifying endpoints, so an outer `LIMIT` stops the search early.",
         "The SIMD backend (scalar, AVX2, AVX-512 or NEON) is chosen at runtime; set `SASSY_C_BACKEND` before the first search to force one. `sassy_backend_info()` reports what is compiled, supported and selected.",
-        "Loading executes no SQL and writes nothing to the database, so read-only databases are supported. MinGW and Rtools x86-64 builds use static Rust/GCC runtimes and Windows system DLLs. MSVC is unsupported. WebAssembly remains excluded: the scalar MVP/EH modules pass SQL smoke tests but cannot recover Rust panics with the pinned prebuilt std; shared-memory builds also require an atomics-enabled std."
+        "Loading executes no SQL and writes nothing to the database, so read-only databases are supported. MinGW and Rtools x86-64 builds use static Rust/GCC runtimes and Windows system DLLs. MSVC is unsupported. The default DuckDB-Wasm MVP and EH bundles are supported with scalar search and a fail-stop Rust panic ABI; the optional COI/threads bundle remains excluded pending an atomics-enabled Rust standard library."
       ]
     }
   },
@@ -132,9 +132,9 @@
       "name": "sassy_crispr_matches",
       "kind": "scalar",
       "category": "CRISPR",
-      "signature": "sassy_crispr_matches(guide, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])\n-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true",
-      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]",
-      "description": "Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default.",
+      "signature": "sassy_crispr_matches(guide, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc[, cigar_format]]]]])\n-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true, cigar_format = 'text'",
+      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]",
+      "description": "Find guide occurrences with at most k edits over the whole guide, including its trailing PAM. Hits must end in an exact IUPAC PAM match unless `allow_pam_edits` is true, and targets whose N fraction exceeds `max_n_frac` are dropped. Both strands are searched by default. `cigar_format` selects text, packed BAM operations, or both.",
       "examples": [
         "SELECT unnest(sassy_crispr_matches('ACGTNGG', 'TTACGTAGGTT', 1), recursive := true);"
       ]
@@ -143,9 +143,9 @@
       "name": "sassy_crispr_matches_many",
       "kind": "scalar",
       "category": "CRISPR",
-      "signature": "sassy_crispr_matches_many(guides, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc]]]])\n-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true",
-      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR)[]",
-      "description": "Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls.",
+      "signature": "sassy_crispr_matches_many(guides, text, k[, pam_length[, allow_pam_edits[, max_n_frac[, rc[, cigar_format]]]]])\n-- Optional arguments are positional; defaults: pam_length = 3, allow_pam_edits = false, max_n_frac = 0.2, rc = true, cigar_format = 'text'",
+      "returns": "STRUCT(pattern_idx UBIGINT, text_start UBIGINT, text_end UBIGINT, pattern_start UBIGINT, pattern_end UBIGINT, cost INTEGER, strand VARCHAR, cigar VARCHAR, cigar_ops UINTEGER[])[]",
+      "description": "Search a guide panel sharing the same PAM suffix; each hit carries the guide's zero-based `pattern_idx`. Guides with different PAMs belong in separate rows or calls. `cigar_format` selects text, packed BAM operations, or both.",
       "examples": [
         "SELECT hit.pattern_idx, hit.text_start, hit.strand\nFROM (SELECT unnest(sassy_crispr_matches_many(['ACGTNGG', 'TTTTNGG'], 'TTACGTAGGTT', 0)) AS hit);"
       ]

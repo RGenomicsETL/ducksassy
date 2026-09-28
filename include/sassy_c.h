@@ -15,6 +15,8 @@ extern "C" {
 #define SASSY_C_DNA 1U
 #define SASSY_C_IUPAC 2U
 #define SASSY_C_PACKED_CIGAR 1U /* options.reserved bit: request packed ops */
+#define SASSY_C_INCLUDE_TEXT_CIGAR 1U
+#define SASSY_C_INCLUDE_PACKED_CIGAR 2U
 
 typedef struct sassy_c_searcher sassy_c_searcher;
 typedef struct sassy_c_result sassy_c_result;
@@ -60,7 +62,9 @@ typedef struct {
 
 /* ABI 1: sizeof(options)=16, sizeof(hit)=64. Set struct_size=sizeof(sassy_c_options).
  * reserved is a bit set: only SASSY_C_PACKED_CIGAR is defined; other bits
- * are rejected. all_endpoints and include_cigar are 0/1, not ABI-dependent enums.
+ * are rejected. Generic all_endpoints and include_cigar are 0/1. CRISPR
+ * include_cigar combines SASSY_C_INCLUDE_TEXT_CIGAR and
+ * SASSY_C_INCLUDE_PACKED_CIGAR.
  * DNA/IUPAC inputs accept either case; ASCII uses literal bytes <128 (NUL allowed).
  * Empty texts/panels produce an empty result. Empty/NULL panel elements error.
  * Patterns contain 1..4096 bytes, panels <=4096 patterns, k < every pattern length.
@@ -106,7 +110,8 @@ int32_t sassy_c_search_many(sassy_c_searcher *searcher, const sassy_c_slice *pat
  * over the complete guide including PAM. allow_pam_edits=0 applies the exact
  * IUPAC PAM endpoint filter, not a separate constrained-alignment scoring model.
  * N/n content is filtered over the full target match, including PAM, with a
- * float32 fraction in [0,1]. sizeof(crispr_options)=20; struct_size and flags
+ * float32 fraction in [0,1]. include_cigar selects text, packed or both via
+ * SASSY_C_INCLUDE_*_CIGAR. sizeof(crispr_options)=20; struct_size and flags
  * follow the rules above. */
 int32_t sassy_c_crispr_search_many(sassy_c_searcher *searcher, const sassy_c_slice *guides,
                                    size_t n_guides, sassy_c_slice text, uint32_t k,

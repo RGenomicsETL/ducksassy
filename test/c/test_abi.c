@@ -139,9 +139,22 @@ int main(void) {
            SASSY_C_INVALID);
     assert(result == NULL);
     crispr.pam_length = 3;
+    crispr.include_cigar = SASSY_C_INCLUDE_TEXT_CIGAR | SASSY_C_INCLUDE_PACKED_CIGAR;
     assert(sassy_c_crispr_search_many(searcher, guides, 1, span("ACGTAGG"), 0, &crispr, &result) ==
            SASSY_C_OK);
+    assert(sassy_c_result_view(result, &hits, &n, &cigars, &nc) == SASSY_C_OK);
+    const sassy_c_op_span *spans = NULL;
+    const uint32_t *ops = NULL;
+    size_t op_count = 0;
+    assert(n == 1 && nc == 2 && memcmp(cigars, "7=", 2) == 0);
+    assert(sassy_c_result_ops_view(result, &spans, &ops, &op_count) == SASSY_C_OK);
+    assert(spans[0].length == 1 && ops[spans[0].offset] == ((7U << 4) | 7U));
     sassy_c_result_free(result);
+    result = NULL;
+    crispr.include_cigar = 4;
+    assert(sassy_c_crispr_search_many(searcher, guides, 1, span("ACGTAGG"), 0, &crispr, &result) ==
+           SASSY_C_INVALID);
+    assert(result == NULL);
     sassy_c_searcher_free(searcher);
     puts("C ABI tests passed");
     return 0;

@@ -90,7 +90,7 @@ Candidate macros:
 
 V2 therefore retains private `__sassy_*` natives and public macros. Required
 arguments are positional on both hosts; only v1 has positional trailing
-options. The R package targets the v2 preview.
+options. The R package builds and loads the released v1 host.
 
 ## Host boundary and ownership
 
@@ -159,12 +159,13 @@ and produce `build/{release,debug}/ducksassy.duckdb_extension` plus the nested
 `extension/ducksassy/` copies expected by distribution CI. Install `ccache`, or
 pass `CMAKE_FLAGS=-DCMAKE_C_COMPILER_LAUNCHER=` to build without its launcher.
 The local v1 targets above use `build-v1/`; v2 uses `configure-v2`, `release-v2`
-and `test-v2` in `build/`. R packages bundle the v2 adapter.
+and `test-v2` in `build/`. Rducksassy bundles the v1 adapter.
 
 `MainDistributionPipeline.yml` enables the full upstream Linux x86-64/ARM64,
 macOS x86-64/ARM64 and Windows x86-64 MinGW/Rtools matrix
-(`reduced_ci_mode: disabled`). MSVC remains excluded. All Wasm variants remain
-excluded for the exception/shared-memory blockers documented below.
+(`reduced_ci_mode: disabled`). MSVC and the optional DuckDB-Wasm COI/threads
+bundle remain excluded. The default DuckDB-Wasm MVP and EH bundles are release
+targets.
 Native v1 sqllogictests cover the public symbols, scalar defaults,
 BLOB/VARCHAR, NULL/empty inputs, text/packed CIGAR, CRISPR, backend inspection,
 relation composition and grep. Separate jobs run ARM64 NEON C/Rust contracts
@@ -173,11 +174,11 @@ inspection does not work under ptrace; unsanitized CTest retains QEMU coverage.
 DuckHTS is not loaded by the sanitizer job, and Rust archives are not instrumented.
 
 `cran-check.yml` builds a self-contained R source tarball and checks its unpacked
-contents with `r-lib/actions/check-r-package` on Linux and macOS, using R release
-and the `duckdb.2.0.dev` preview package. A Linux job also runs `make r-test`.
-The exact preview engine revision remains checked by that integration test.
-Windows is outside the package's `OS_type: unix` support. R-devel/source-built
-DuckDB compatibility is outside this binary-oriented matrix.
+contents with `r-lib/actions/check-r-package` on Linux, macOS and Windows, using
+R release and the stable CRAN `duckdb` package. Package tests load the bundled
+v1 extension and exercise scalar, table and backend-inspection functions.
+R-devel/source-built DuckDB compatibility is outside this binary-oriented
+matrix.
 
 `test/native_load.py` checks native catalog types, repeated `LOAD`, fresh file
 close/reopen, read-only primary loading, unchanged database bytes and worker
@@ -264,7 +265,7 @@ That Wine unit-test run is **not a pass**, even though its runner can return
 zero. The DLL/SQL smoke test passes; the standalone Rust test harness still
 needs a real Windows run.
 
-#### Wasm browser probes
+#### Wasm distribution
 
 Use emsdk **3.1.71** under `.deps-port/`, matching distribution CI. Start with
 a clean `cmake_build/` when switching between native and Emscripten toolchains:
@@ -285,63 +286,28 @@ make wasm-playwright-test
 CMake creates one static `libducksassy.a` containing adapter, core, dispatcher
 and Rust objects; the final `emcc` link needs no extra archive. Cargo outputs
 are separated by Wasm variant. MVP/EH compile only the scalar backend without
-SIMD; threads select wasm128 with atomics/bulk-memory. Final EH/thread links
-receive their variant flags. Cargo does not inherit final-link `EMCC_CFLAGS`,
-since Rust specifies its own exception ABI. Rust's unused dependency cdylib
-uses `--no-entry`. The Emscripten link uses `-O1` to skip Binaryen's post-link
-optimizer, which does not recognize Rust 1.91's `bulk-memory-opt` feature tag;
-Rust release optimization remains enabled. The incompatible optimizer reports
-`Unknown option '--enable-bulk-memory-opt'` at higher link optimization levels.
-No engine or Rust std is patched.
+SIMD. The Emscripten link uses `-O1`; Rust release optimization remains enabled.
+No engine or Rust standard library is patched.
 
-`test/wasm` uses the DuckHTS loopback-server/Playwright pattern with COOP/COEP,
-pinned local npm dependencies and no CDN. `@duckdb/duckdb-wasm@1.33.1-dev64.0`
-reports **v1.5.5, d8cdaa33fd** for both tested bundles. The browser tests run
-`hello_world_lines`, every function-catalog example, native catalog checks,
-VARCHAR/BLOB, reverse strands, packed CIGAR, NULL/error recovery, multiple
-vectors, result growth, streaming grep LIMIT and scalar backend selection.
-The test-only panic extension uses the same Rust std and side-module link ABI;
-if it cannot recover, the test requires that variant to remain excluded.
-`.github/workflows/wasm-playwright.yml` checks these probes, not release support.
+Public validation failures return ordinary DuckDB errors and the same worker
+remains queryable. Rust's prebuilt Emscripten standard library uses JS exception
+handling, which cannot unwind a Rust panic through DuckDB's side-module boundary.
+An internal Rust panic therefore follows a fail-stop contract: the browser must
+terminate that worker, and a fresh worker must load and query the extension
+successfully.
 
-WABT 1.0.34 validates both modules with SIMD disabled and its default prohibition
-of exception instructions/shared memory. Disassembly contains **zero SIMD or
-exception-handling instructions**. MVP's feature section lists mutable-globals,
-nontrapping-fptoint, bulk-memory, sign-ext, reference-types and multivalue; EH
-also advertises exception-handling from its C/link flags. Both contain Rust's
-JS-EH imports (`invoke_*`, `__cxa_find_matching_catch_*`); the EH feature tag does
-not convert the prebuilt Rust std to native EH.
+`test/wasm` uses a loopback Playwright server with COOP/COEP, pinned local npm
+dependencies and no CDN. The browser gate runs the function-catalog examples,
+VARCHAR/BLOB overloads, reverse strands, general and CRISPR packed CIGAR,
+NULL/error recovery, result growth, streaming grep and backend selection. A
+test-only panic extension verifies worker termination and restart for both MVP
+and EH. WABT validates each artifact against its platform feature contract.
 
-**Distribution blockers (observed locally):**
-
-- `wasm_mvp`: normal SQL passes, but Rust's prebuilt JS-EH unwinder cannot
-  recover a panic in the matching host. The browser reports:
-  ```text
-  ReferenceError: _setThrew is not defined
-  ```
-- `wasm_eh`: normal SQL passes, but native host exceptions do not match Rust's
-  prebuilt JS-EH panic path. The panic probe reports:
-  ```text
-  fatal runtime error: Rust panics must be rethrown, aborting
-  RangeError: Maximum call stack size exceeded
-  ```
-- `panic=abort` cannot bypass the pinned std's unwind contract:
-  ```text
-  error: the crate `core` requires panic strategy `unwind` which is incompatible with this crate's strategy of `abort`
-  ```
-- `wasm_threads`: the real `make wasm_threads` reaches the shared-memory link
-  with SIMD/atomics/bulk-memory enabled on project code, then fails:
-  ```text
-  wasm-ld: error: --shared-memory is disallowed by compiler_builtins-fd473d5274797cdf.compiler_builtins.38a2944bffb8e539-cgu.129.rcgu.o because it was not compiled with 'atomics' or 'bulk-memory' features.
-  ```
-
-A failed unwind invalidates the browser worker; it is not native searcher
-poisoning/recovery. Enabling Wasm distribution requires a compatible Rust std
-and successful panic recovery (or a deliberate, verified abort contract).
-Threads additionally need an atomics-enabled std. Rebuilding std with nightly
-is outside this stable-toolchain contract. All three variants remain excluded.
-The local browser and cross-build results do not establish that the remote
-Windows/macOS/ARM distribution matrix passes.
+The optional `wasm_threads`/COI target remains excluded. It requires an
+atomics-enabled Rust standard library, while Rust distributes the Emscripten
+standard library without shared-memory atomics. Supporting that target requires
+an independently qualified `build-std` toolchain and vendored sysroot
+dependencies; MVP and EH cover DuckDB-Wasm's default bundles.
 
 ### Native verification
 
@@ -350,12 +316,11 @@ the v2 macro collision probe; upstream CRISPR agrees across 36 profiles and 864
 guide/record comparisons. Nine SQL families pass through the R/DBI preview
 (`bcff503658`), and README rendering succeeds. ASan/LSan on the v1 C adapter/core
 passes native-only read-only/load/close/reopen tests without a leak report.
-The source R package builds and passes `R CMD check --no-manual` with
-`Status: OK`. `--as-cran` has no errors or warnings; its incoming-feasibility
-NOTE covers the development version, preview repository and Pages URL (404
-until first deployment). `Rduckhts` is a suggested runtime dependency: the
-connection helpers require its installed extension files but do not import
-its R namespace. Examples explicitly select the v2 preview driver.
+The stable-v1 R source package builds offline and passes
+`R CMD check --as-cran --no-manual` on local Ubuntu 24.04 with no errors or
+warnings. Its only NOTE identifies version 0.1.0 as a new submission. Package
+tests load the bundled extension through CRAN `duckdb` 1.5.5; DuckHTS remains
+an optional community extension for file readers.
 
 The full sanitizer suite with the existing DuckHTS binary reports:
 

@@ -2,41 +2,30 @@
 % Please edit documentation in R/connection.R
 \name{rducksassy_connect}
 \alias{rducksassy_connect}
-\title{Open a DuckDB connection with Ducksassy and DuckHTS}
+\title{Open a DuckDB connection with Ducksassy loaded}
 \usage{
-rducksassy_connect(
-  dbdir = ":memory:",
-  read_only = FALSE,
-  driver = getOption("Rducksassy.driver")
-)
+rducksassy_connect(dbdir = ":memory:", read_only = FALSE, config = list(), ...)
 }
 \arguments{
-\item{dbdir}{Database file or \code{":memory:"}.}
+\item{dbdir}{Database file path or \code{":memory:"}.}
 
-\item{read_only}{Open an existing database read-only.}
+\item{read_only}{Open an existing database without write access.}
 
-\item{driver}{Driver constructor, defaulting to \code{duckdb::duckdb}.
-Supply another DuckDB DBI driver constructor for a host with C API v2
-support. It receives \code{dbdir}, \code{read_only} and \code{config}.}
+\item{config}{Named DuckDB configuration values.}
+
+\item{...}{Additional arguments passed to \code{\link[duckdb:duckdb]{duckdb::duckdb()}}.}
 }
 \value{
-A DBI connection. Close it with \code{DBI::dbDisconnect(con, shutdown = TRUE)}.
+A live DuckDB DBI connection. Disconnect it with
+\code{DBI::dbDisconnect(con, shutdown = TRUE)}.
 }
 \description{
-Requires a DuckDB host with C API v2 support and the suggested
-\code{Rduckhts} package for its installed extension files.
-The connection allows loading the extensions built by the R packages.
-Automatic extension downloads are disabled.
+Creates an isolated DuckDB database handle, opens a DBI connection, and
+loads the extension bundled with Rducksassy. The database handle permits
+unsigned extensions because locally built DuckDB extensions are not signed.
 }
 \examples{
-if (requireNamespace("duckdb.2.0.dev", quietly = TRUE) &&
-    nzchar(system.file(package = "Rduckhts"))) {
-  # Returns NULL on a preview engine this build does not support.
-  con <- tryCatch(rducksassy_connect(driver = duckdb.2.0.dev::duckdb),
-                  rducksassy_incompatible_host = function(e) NULL)
-  if (!is.null(con)) {
-    print(DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)"))
-    DBI::dbDisconnect(con, shutdown = TRUE)
-  }
-}
+con <- rducksassy_connect()
+DBI::dbGetQuery(con, "SELECT sassy_contains('ACGT', 'TTACGT', 0)")
+DBI::dbDisconnect(con, shutdown = TRUE)
 }
