@@ -63,11 +63,12 @@ if(MINGW)
         set(RUST_NATIVE_LINK_FLAGS "-Lnative=${CMAKE_BINARY_DIR}/rust-link")
     endif()
 endif()
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Python3 3.8 COMPONENTS Interpreter REQUIRED)
 if(NOT WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     find_package(Threads REQUIRED)
 endif()
 option(DUCKSASSY_DISTRIBUTION "Leave extension metadata to extension-ci-tools" OFF)
+set(DUCKSASSY_EXTENSION_VERSION "0.1.0" CACHE STRING "Extension package version")
 set(DUCKSASSY_HOST "v2" CACHE STRING "DuckDB host adapter: v1 or v2")
 set_property(CACHE DUCKSASSY_HOST PROPERTY STRINGS v1 v2)
 if(DUCKSASSY_HOST STREQUAL "v1")
@@ -292,7 +293,7 @@ if(NOT DUCKSASSY_DISTRIBUTION AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             --library-file "$<TARGET_FILE:ducksassy>" --extension-name ducksassy
             --out-file "${CMAKE_BINARY_DIR}/ducksassy.duckdb_extension"
             --duckdb-platform "${DUCKDB_PLATFORM}" --duckdb-version "${DUCKDB_ABI_VERSION}"
-            --extension-version 0.1.0-dev --abi-type C_STRUCT
+            --extension-version "${DUCKSASSY_EXTENSION_VERSION}" --abi-type C_STRUCT
         VERBATIM)
 endif()
 include(CTest)

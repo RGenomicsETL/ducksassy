@@ -152,24 +152,19 @@ outdated `.deps/sassy-source` checkout aside before rerunning `make setup`.
 
 ### R package
 
-[`Rducksassy`](r/Rducksassy/README.md) builds the extension from bundled sources
-and provides `rducksassy_connect()` and `rducksassy_load()`. It requires
-a DuckDB host with C API v2 support and the extension bundled by `Rduckhts`.
-Its examples include searching BAM read sequences while retaining alignment
-identifiers for SQL joins and summaries.
+[`Rducksassy`](r/Rducksassy/README.md) builds the stable C API v1 extension
+from bundled sources and provides `rducksassy_connect()` and
+`rducksassy_load()` for the CRAN `duckdb` package.
 
 ``` r
-install.packages(c("Rducksassy", "Rduckhts"), repos = c(
-  "https://rgenomicsetl.r-universe.dev",
-  "https://duckdb.r-universe.dev",
-  "https://cloud.r-project.org"
-))
-# One available C API v2 host; other compatible drivers can be supplied.
-install.packages("duckdb.2.0.dev", repos = "https://duckdb.r-universe.dev")
-con <- Rducksassy::rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
+install.packages("Rducksassy")
+con <- Rducksassy::rducksassy_connect()
 DBI::dbGetQuery(con, "SELECT * FROM sassy_grep('timeout', 'request timedout', 1)")
 DBI::dbDisconnect(con, shutdown = TRUE)
 ```
+
+Install and load the signed DuckHTS community extension when FASTA, FASTQ or BAM
+readers are needed; the Ducksassy scalar functions accept its sequence columns.
 
 `make vendor-rust` refreshes the shared Rust source archive using the committed
 lockfile. Native and R package builds use it offline. `make r-package` stages

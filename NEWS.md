@@ -1,4 +1,4 @@
-# ducksassy 0.1.0-dev
+# ducksassy 0.1.0
 
 - Document every released-host function in `functions.yaml`, rendered by
   `make function_catalog` into `docs/functions.md` and, following DuckHTS, into

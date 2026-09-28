@@ -13,41 +13,24 @@ knitr::opts_chunk$set(error = FALSE, collapse = TRUE, comment = "#>")
 
 # Rducksassy
 
-Approximate text and sequence search inside DuckDB, with DuckHTS readers for
-FASTA, FASTQ and BAM. Matches remain ordinary SQL rows: join them to annotations,
-filter them and summarize them in the same query.
+Approximate text and sequence search inside DuckDB. Matches remain ordinary SQL
+values and rows that can be joined to annotations, filtered and summarized in
+the same query.
 
 ## Install
 
 ```{r install, eval=FALSE}
-install.packages(c("Rducksassy", "Rduckhts"), repos = c(
-  "https://rgenomicsetl.r-universe.dev",
-  "https://duckdb.r-universe.dev",
-  "https://cloud.r-project.org"
-))
+install.packages("Rducksassy")
 ```
 
-Loading the extension requires a **DuckDB host with C API v2 support**.
-The connection helpers also require the suggested `Rduckhts` package for its
-installed extension files; they do not load its R namespace.
-The package builds against bundled headers and does not link to a particular
-R DuckDB driver. `rducksassy_load(con)` accepts an existing compatible DBI
-connection; `rducksassy_connect()` uses `duckdb::duckdb` by default and also
-accepts a driver constructor.
+Source installation builds the bundled Ducksassy extension with Rust and Cargo
+>= 1.91, CMake >= 3.20, Python >= 3.8 and a C11 compiler. Rust dependency
+resolution is locked and offline. The package uses the stable DuckDB C extension
+API provided by `duckdb` >= 1.5.5.
 
-The examples below use `duckdb.2.0.dev`, an optional host available from
-DuckDB's R-universe. The tested `duckdb` 1.5.5 host supports only C API v1
-and cannot load this extension.
-
-```{r install-example-host, eval=FALSE}
-install.packages("duckdb.2.0.dev", repos = "https://duckdb.r-universe.dev")
-```
-
-Source installation builds the extension from bundled sources with Rust >= 1.91,
-Cargo, CMake >= 3.20, Python 3 and a C11 compiler. Rust dependency resolution is
-locked and offline. Linux is tested; macOS uses the native build path. Windows
-and webR packaging are not implemented. CRAN readiness still depends on a
-released host supporting C API v2.
+`rducksassy_connect()` creates an isolated DuckDB handle and loads the packaged
+extension. `rducksassy_load(con)` loads it into an existing compatible DuckDB
+DBI connection.
 
 ## Fuzzy grep in SQL
 
@@ -55,15 +38,16 @@ Find `timeout` with one edit allowed. The inserted `d` in `timedout` is reported
 in the CIGAR; coordinates are zero-based, half-open byte offsets.
 
 ```{r text-search}
-con <- Rducksassy::rducksassy_connect(driver = duckdb.2.0.dev::duckdb)
+con <- Rducksassy::rducksassy_connect()
 DBI::dbGetQuery(con, "
   SELECT text_start, text_end, cost, cigar
   FROM sassy_grep('timeout', 'request timedout', 1)
 ")
 ```
 
-Search a text column and group the matching rows without exporting them to a
-separate grep process:
+Search a text column and group matching rows without exporting them to a
+separate grep process. Stable C API scalar arguments are positional, with
+trailing defaults.
 
 ```{r text-summary}
 DBI::dbGetQuery(con, "
@@ -74,40 +58,46 @@ DBI::dbGetQuery(con, "
   )
   SELECT service, count(*) AS matching_messages
   FROM logs
-  WHERE sassy_contains('timeout', message, 1, alphabet := 'ascii', rc := false)
+  WHERE sassy_contains('timeout', message, 1, 'ascii', false)
   GROUP BY service
   ORDER BY service
 ")
 ```
 
-## Search BAM read sequences
+## Search CRISPR guides
 
-The included synthetic BAM contains a forward read, a reverse read and a
-secondary alignment. This query excludes secondary and supplementary alignments
-and searches the stored read sequence on both strands:
+Search guide and PAM together on both strands, then expand each result struct
+into rows.
 
-```{r bam-search}
-bam <- system.file("extdata", "crispr_reads.bam", package = "Rducksassy",
-                   mustWork = TRUE)
-sql <- paste0(
-  "SELECT r.QNAME, r.RNAME, r.POS, r.FLAG, ",
-  "hit.text_start, hit.text_end, hit.strand, hit.cigar FROM read_bam(",
-  DBI::dbQuoteString(con, bam), ") AS r CROSS JOIN LATERAL ",
-  "UNNEST(sassy_crispr_matches('ACGTNGG', r.SEQ, 0)) AS matches(hit) ",
-  "WHERE (r.FLAG & 2304) = 0 ORDER BY r.QNAME"
-)
-DBI::dbGetQuery(con, sql)
+```{r crispr-search}
+DBI::dbGetQuery(con, "
+  SELECT target, hit.*
+  FROM (VALUES
+    ('exact', 'TTACGTAGGTT'),
+    ('one_edit', 'TTACCTAGGTT')
+  ) AS targets(target, sequence)
+  CROSS JOIN LATERAL unnest(
+    sassy_crispr_matches('ACGTNGG', sequence, 1)
+  ) AS matches(hit)
+  ORDER BY target, hit.text_start
+")
 ```
 
-`SEQ` is the text sequence column from `read_bam()`. `hit.text_start` and
-`hit.text_end` describe a zero-based half-open interval in that stored sequence.
-`hit.strand` is relative to it. Mapping hits back to reference coordinates requires
-the BAM flag and alignment CIGAR, including clipping and indels. This example finds
-guide-like sequences in reads; it does not estimate genomic off-target risk.
+DuckHTS can supply FASTA, FASTQ and BAM rows directly. Install its signed
+community extension once, load it into the connection, and pass its sequence
+columns to the scalar functions.
 
-The SQL filter uses flag mask 2304 (`0x100 | 0x800`). Read identifiers and alignment
-columns remain available for grouping by sample, read group or locus. A guide panel
-can use `sassy_crispr_matches_many()` in the same query.
+```{r duckhts, eval=FALSE}
+DBI::dbExecute(con, "INSTALL duckhts FROM community")
+DBI::dbExecute(con, "LOAD duckhts")
+DBI::dbGetQuery(con, "
+  SELECT record.name, hit.*
+  FROM read_fasta('reference.fa') AS record
+  CROSS JOIN LATERAL UNNEST(
+    sassy_matches('ACGT', record.sequence, 1)
+  ) AS matches(hit)
+")
+```
 
 ```{r disconnect}
 DBI::dbDisconnect(con, shutdown = TRUE)
@@ -124,9 +114,10 @@ Search uses Sassy by Rick Beeloo and Ragnar Groot Koerkamp:
 ## Develop
 
 From the repository root, `make vendor-rust` refreshes the shared bundle from
-`rust/Cargo.lock`; `make r-package` stages the canonical C/Rust sources and builds
-the R source tarball. The staged source tree under `src/extension` is generated;
-edit the repository sources and stage again. Retain the lockfile during cleanup.
+`rust/Cargo.lock`; `make r-package` stages the canonical C/Rust sources and
+builds the R source tarball. The staged source tree under `src/extension` is
+generated; edit the repository sources and stage again. Retain the lockfile
+during cleanup.
 
 Install the package, then run `make r-readme` to regenerate this page. Its search
-examples execute against the installed package, including the bundled BAM.
+examples execute against the installed package.

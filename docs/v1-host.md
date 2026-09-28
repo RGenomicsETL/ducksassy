@@ -90,7 +90,7 @@ Candidate macros:
 
 V2 therefore retains private `__sassy_*` natives and public macros. Required
 arguments are positional on both hosts; only v1 has positional trailing
-options. The R package targets the v2 preview.
+options. The R package builds and loads the released v1 host.
 
 ## Host boundary and ownership
 
@@ -159,7 +159,7 @@ and produce `build/{release,debug}/ducksassy.duckdb_extension` plus the nested
 `extension/ducksassy/` copies expected by distribution CI. Install `ccache`, or
 pass `CMAKE_FLAGS=-DCMAKE_C_COMPILER_LAUNCHER=` to build without its launcher.
 The local v1 targets above use `build-v1/`; v2 uses `configure-v2`, `release-v2`
-and `test-v2` in `build/`. R packages bundle the v2 adapter.
+and `test-v2` in `build/`. Rducksassy bundles the v1 adapter.
 
 `MainDistributionPipeline.yml` enables the full upstream Linux x86-64/ARM64,
 macOS x86-64/ARM64 and Windows x86-64 MinGW/Rtools matrix
@@ -173,11 +173,11 @@ inspection does not work under ptrace; unsanitized CTest retains QEMU coverage.
 DuckHTS is not loaded by the sanitizer job, and Rust archives are not instrumented.
 
 `cran-check.yml` builds a self-contained R source tarball and checks its unpacked
-contents with `r-lib/actions/check-r-package` on Linux and macOS, using R release
-and the `duckdb.2.0.dev` preview package. A Linux job also runs `make r-test`.
-The exact preview engine revision remains checked by that integration test.
-Windows is outside the package's `OS_type: unix` support. R-devel/source-built
-DuckDB compatibility is outside this binary-oriented matrix.
+contents with `r-lib/actions/check-r-package` on Linux, macOS and Windows, using
+R release and the stable CRAN `duckdb` package. Package tests load the bundled
+v1 extension and exercise scalar, table and backend-inspection functions.
+R-devel/source-built DuckDB compatibility is outside this binary-oriented
+matrix.
 
 `test/native_load.py` checks native catalog types, repeated `LOAD`, fresh file
 close/reopen, read-only primary loading, unchanged database bytes and worker
@@ -350,12 +350,11 @@ the v2 macro collision probe; upstream CRISPR agrees across 36 profiles and 864
 guide/record comparisons. Nine SQL families pass through the R/DBI preview
 (`bcff503658`), and README rendering succeeds. ASan/LSan on the v1 C adapter/core
 passes native-only read-only/load/close/reopen tests without a leak report.
-The source R package builds and passes `R CMD check --no-manual` with
-`Status: OK`. `--as-cran` has no errors or warnings; its incoming-feasibility
-NOTE covers the development version, preview repository and Pages URL (404
-until first deployment). `Rduckhts` is a suggested runtime dependency: the
-connection helpers require its installed extension files but do not import
-its R namespace. Examples explicitly select the v2 preview driver.
+The stable-v1 R source package builds offline and passes
+`R CMD check --as-cran --no-manual` on local Ubuntu 24.04 with no errors or
+warnings. Its only NOTE identifies version 0.1.0 as a new submission. Package
+tests load the bundled extension through CRAN `duckdb` 1.5.5; DuckHTS remains
+an optional community extension for file readers.
 
 The full sanitizer suite with the existing DuckHTS binary reports:
 

@@ -21,12 +21,15 @@ manifest <- utils::read.delim(file.path(package, "tools", "sources.tsv"), sep = 
                               header = FALSE, col.names = c("repo_path", "package_path"),
                               stringsAsFactors = FALSE, quote = "", comment.char = "")
 missing <- manifest$repo_path[!file.exists(file.path(repo_root, manifest$repo_path))]
-if (length(missing)) stop("Missing canonical sources: ", paste(missing, collapse = ", "), call. = FALSE)
+if (length(missing) > 0L) stop("Missing canonical sources: ", paste(missing, collapse = ", "), call. = FALSE)
 
 # Remove previous copies so files dropped from the manifest cannot linger.
-generated_dirs <- unique(vapply(strsplit(manifest$package_path, "/", fixed = TRUE),
-                                function(parts) paste(parts[seq_len(min(2L, length(parts) - 1L))], collapse = "/"),
-                                character(1)))
+generated_dirs <- unique(c(
+  vapply(strsplit(manifest$package_path, "/", fixed = TRUE),
+         function(parts) paste(parts[seq_len(min(2L, length(parts) - 1L))], collapse = "/"),
+         character(1)),
+  "inst/sql"
+))
 unlink(file.path(package, generated_dirs), recursive = TRUE)
 for (i in seq_len(nrow(manifest))) {
   target <- file.path(package, manifest$package_path[[i]])
@@ -44,19 +47,6 @@ notices <- c("DuckDB C API headers and extension metadata tool.",
 writeLines(notices, file.path(package, "inst", "LICENCE.note"))
 stopifnot(file.copy(file.path(package, "DESCRIPTION.in"),
                     file.path(package, "DESCRIPTION"), overwrite = TRUE))
-
-# The C API v2 preview is not ABI-stable across engine commits. Record the
-# engines whose headers match the bundled SDK: the pinned SDK/CLI engine and the
-# pinned R host engine. rducksassy_load() refuses other hosts.
-pins <- readLines(file.path(repo_root, "ducksassy-package.json"), warn = FALSE)
-pin <- function(key) {
-  value <- sub(sprintf('.*"%s": *"([0-9a-f]{40})".*', key), "\\1",
-               grep(sprintf('"%s"', key), pins, value = TRUE))
-  if (length(value) != 1L || nchar(value) != 40L) stop("Missing pin ", key, call. = FALSE)
-  substr(value, 1L, 10L)
-}
-writeLines(c(pin("duckdb_sdk_revision"), pin("engine_revision")),
-           file.path(package, "inst", "host_revisions"))
 
 patches <- sort(list.files(file.path(package, "tools", "patches"),
                            pattern = "[.]patch$", full.names = TRUE))

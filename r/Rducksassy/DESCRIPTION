@@ -1,35 +1,33 @@
 Package: Rducksassy
-Type: Package
-Title: Approximate Text and Sequence Search in DuckDB
-Version: 0.1.0.9000
+Title: Approximate String Matching for 'DuckDB'
+Version: 0.1.0
 Authors@R: c(
-    person("Sounkou Mahamane", "Toure", email = "sounkoutoure@gmail.com",
-           role = c("aut", "cre")),
-    person("Rick", "Beeloo", role = "cph",
-           comment = "Sassy library"),
-    person("Ragnar", "Groot Koerkamp", role = "cph",
-           comment = "Sassy library"),
-    person("Stichting DuckDB Foundation", role = "cph",
-           comment = "Bundled C API headers and extension metadata tool"))
-Description: Builds and loads the 'ducksassy' DuckDB extension for approximate
-    text, DNA and CRISPR searches using the 'Sassy' Rust library by Beeloo and
-    Groot Koerkamp (2026) <doi:10.1093/bioinformatics/btag244>. Search results
-    compose with SQL filtering, joins and aggregation. FASTA and FASTQ readers
-    are supplied by 'Rduckhts'. Loading the extension requires a DuckDB host
-    with C API v2 support.
+    person(given = "Sounkou Mahamane", family = "Toure",
+           email = "sounkoutoure@gmail.com", role = c("aut", "cre")),
+    person(given = "Rick", family = "Beeloo", role = c("ctb", "cph"),
+           comment = "Sassy, bundled under the MIT license"),
+    person(given = "Ragnar", family = "Groot Koerkamp", role = c("ctb", "cph"),
+           comment = "Sassy, bundled under the MIT license"),
+    person("DuckDB Foundation", role = "cph",
+           comment = "DuckDB headers and metadata tool, bundled under the MIT license")
+    )
+Description: Builds and loads the 'ducksassy' extension for 'DuckDB', providing
+    approximate DNA, IUPAC and ASCII string matching through the 'Sassy' SIMD
+    kernels. Search scalar values, pattern panels and CRISPR guide targets from
+    SQL. The matching method is described by Beeloo and Groot Koerkamp (2026)
+    <doi:10.1093/bioinformatics/btag244>.
 License: GPL (>= 2)
-Copyright: See inst/LICENCE.note for bundled dependency authors and licenses.
-URL: https://rgenomicsetl.github.io/ducksassy/,
-    https://github.com/RGenomicsETL/ducksassy
-BugReports: https://github.com/RGenomicsETL/ducksassy/issues
-Depends: R (>= 4.2.0)
-Imports: DBI, duckdb
-Suggests: duckdb.2.0.dev, Rduckhts (>= 1.5.2)
-Additional_repositories: https://duckdb.r-universe.dev,
-    https://rgenomicsetl.r-universe.dev
-SystemRequirements: Cargo, rustc (>= 1.91), CMake (>= 3.20), Python (>= 3),
-    C11 compiler with POSIX threads
-OS_type: unix
 Encoding: UTF-8
+SystemRequirements: CMake (>= 3.20), Cargo (Rust's package manager) (>= 1.91),
+    rustc (>= 1.91), Python (>= 3.8), C11 compiler
 NeedsCompilation: yes
+Depends:
+    R (>= 4.1.0)
+Imports:
+    DBI,
+    duckdb (>= 1.5.5)
+URL: https://github.com/RGenomicsETL/ducksassy,
+    https://rgenomicsetl.github.io/ducksassy/
+BugReports: https://github.com/RGenomicsETL/ducksassy/issues
+Roxygen: list(markdown = TRUE)
 Config/roxygen2/version: 8.0.0
