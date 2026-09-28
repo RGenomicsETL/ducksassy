@@ -118,7 +118,7 @@ r-bootstrap:
 # Fails when committed package copies differ from what bootstrap generates.
 r-bootstrap-check: r-bootstrap
 	git diff --exit-code -- r/Rducksassy
-	test -z "$$(git status --porcelain --untracked-files=all -- r/Rducksassy)"
+	test -z "$$(git ls-files --others --exclude-standard -- r/Rducksassy)"
 r-package: r-bootstrap
 	R CMD build r/Rducksassy
 r-readme:
