@@ -18,10 +18,26 @@ for (i in seq_along(sources)) {
   dir.create(dirname(output), recursive = TRUE, showWarnings = FALSE)
   text <- readLines(source, warn = FALSE, encoding = "UTF-8")
   text <- text[!grepl("^<!-- README.md is generated", text)]
+  atx <- which(startsWith(text, "# "))
+  setext <- grep("^=+\\s*$", text) - 1L
+  setext <- setext[setext >= 1L]
+  first <- suppressWarnings(min(c(atx, setext)))
+  title <- tools::file_path_sans_ext(basename(source))
+  if (is.finite(first)) {
+    if (first %in% atx) {
+      title <- substring(text[[first]], 3L)
+      drop <- first
+    } else {
+      title <- text[[first]]
+      drop <- c(first, first + 1L)
+    }
+    text <- text[-drop]
+  }
   prefix <- if (dirname(outputs[[i]]) == ".") "" else "../"
-  litedown::mark(text = c("---", "output: html", "---", text), output = output,
-                 options = list(toc = TRUE),
-                 meta = list(css = c("@default@1.14.69", "@article@1.14.69", css),
+  litedown::mark(text = c("---", paste0("title: ", trimws(title)), "output: html", "---", text),
+                 output = output, options = list(toc = TRUE),
+                 meta = list(css = c("@default@1.14.69", "@article@1.14.69",
+                                      "@site@1.14.69", css),
                              include_before = I(gsub("@ROOT@", prefix, header, fixed = TRUE))))
 
   # Match GitHub's heading fragments used by the committed Markdown reports.
@@ -57,11 +73,11 @@ for (i in seq_along(sources)) {
   xml2::write_html(page, output)
 }
 
-index <- c("# Benchmarks", "", paste0("- [", tools::file_path_sans_ext(basename(reports)),
-                                      "](", sub("\\.md$", ".html", basename(reports)), ")"))
-litedown::mark(text = c("---", "output: html", "---", index),
+index <- paste0("- [", tools::file_path_sans_ext(basename(reports)),
+                "](", sub("\\.md$", ".html", basename(reports)), ")")
+litedown::mark(text = c("---", "title: Benchmarks", "output: html", "---", index),
                output = file.path(destination, "benchmarks", "index.html"),
-               meta = list(`plain-title` = I("ducksassy benchmarks"),
-                           css = c("@default@1.14.69", "@article@1.14.69", css),
+               meta = list(css = c("@default@1.14.69", "@article@1.14.69",
+                                    "@site@1.14.69", css),
                            include_before = I(gsub("@ROOT@", "../", header, fixed = TRUE))))
 source("tools/check-site.R")
