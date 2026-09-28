@@ -7,10 +7,12 @@ driver <- if (requireNamespace("duckdb.2.0.dev", quietly = TRUE)) {
 }
 con <- tryCatch(rducksassy_connect(driver = driver), error = identity)
 if (inherits(con, "error")) {
-  # A C API v1 host cannot execute search tests. Other load failures are errors.
-  if (!grepl("can only load extensions built for DuckDB C API 'v1.x.y'",
-             conditionMessage(con), fixed = TRUE)) stop(con)
-  message("Search tests require a C API v2 host: ", conditionMessage(con))
+  # Search tests need the matching C API v2 preview engine; CRAN's C API v1
+  # duckdb is also rejected by the host check. CI sets RDUCKSASSY_REQUIRE_HOST=true
+  # so a missing or unmatched host fails there instead of skipping.
+  if (!inherits(con, "rducksassy_incompatible_host") ||
+      identical(Sys.getenv("RDUCKSASSY_REQUIRE_HOST"), "true")) stop(con)
+  message("Skipping search tests: ", conditionMessage(con))
   quit(status = 0L)
 }
 result <- DBI::dbGetQuery(con, "

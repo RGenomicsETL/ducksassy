@@ -15,4 +15,13 @@ Invisibly, the supplied connection.
 \description{
 Loads the package-built DuckHTS and Ducksassy extensions into an existing
 DuckDB connection. The host must support C API v2 and permit unsigned extensions.
+Install the suggested \code{Rduckhts} package to supply its extension files;
+its R namespace is not loaded.
+}
+\details{
+The C API v2 preview is not stable between DuckDB engine commits, so the
+extension only loads into the engines it was built for. Other engines raise
+an error of class \code{rducksassy_incompatible_host}. Set
+\code{options(Rducksassy.allow_untested_host = TRUE)} to load anyway, at the
+risk of crashing the R session.
 }

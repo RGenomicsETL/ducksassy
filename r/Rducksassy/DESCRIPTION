@@ -19,11 +19,12 @@ Description: Builds and loads the 'ducksassy' DuckDB extension for approximate
     with C API v2 support.
 License: GPL (>= 2)
 Copyright: See inst/LICENCE.note for bundled dependency authors and licenses.
-URL: https://github.com/RGenomicsETL/ducksassy
+URL: https://rgenomicsetl.github.io/ducksassy/,
+    https://github.com/RGenomicsETL/ducksassy
 BugReports: https://github.com/RGenomicsETL/ducksassy/issues
 Depends: R (>= 4.2.0)
-Imports: DBI, duckdb, Rduckhts (>= 1.5.2)
-Suggests: duckdb.2.0.dev
+Imports: DBI, duckdb
+Suggests: duckdb.2.0.dev, Rduckhts (>= 1.5.2)
 Additional_repositories: https://duckdb.r-universe.dev,
     https://rgenomicsetl.r-universe.dev
 SystemRequirements: Cargo, rustc (>= 1.91), CMake (>= 3.20), Python (>= 3),

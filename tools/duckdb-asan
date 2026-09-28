@@ -1,0 +1,5 @@
+#!/bin/sh
+# Preload ASan only into the released CLI, not the Python test harness.
+: "${DUCKDB_ASAN_CLI:?Set DUCKDB_ASAN_CLI to the released DuckDB CLI}"
+ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1:abort_on_error=1}" \
+LD_PRELOAD="$(cc -print-file-name=libasan.so)" exec "$DUCKDB_ASAN_CLI" "$@"

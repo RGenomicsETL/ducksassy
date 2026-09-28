@@ -1,8 +1,19 @@
 /build/
+/site/
+/cmake_build/
+/configure/
+/.venv/
 /rust/target/
 /.deps/
 /.deps-v1/
+/.deps-port/
+/test/wasm/node_modules
+/test/wasm/test-results/
+/test/wasm/playwright-report/
+/HANDOFF*.md
 /build-v1/
+/build-mingw/
+/build-rtools/
 /build-v2/
 /build-baseline/
 /.pi/
@@ -16,3 +27,5 @@ __pycache__/
 /r/Rducksassy/src/ducksassy.duckdb_extension
 /r/Rducksassy/src/extension/rust/target/
 /*.Rcheck/
+# Untracked checkout of the RGenomicsETL/community-extensions fork.
+/community-extensions/

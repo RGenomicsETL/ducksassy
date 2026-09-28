@@ -27,7 +27,7 @@ jobs:
       - name: Architecture checks
         run: python3 test/check_contract.py
       - name: Configure bundled Rust dependencies
-        run: make configure
+        run: make configure-v2
       - name: Type-check the wasm128 backend
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS: -C target-feature=+simd128
@@ -36,7 +36,7 @@ jobs:
           --target wasm32-unknown-emscripten --no-default-features
           --features backend-wasm128
       - name: Build C adapter and run the real C ABI test
-        run: make test
+        run: make test-v2
       - name: Check loadable entrypoint and absence of DuckDB linkage
         shell: bash
         run: |
