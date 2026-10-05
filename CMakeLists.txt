@@ -239,8 +239,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 elseif(APPLE)
     set(NATIVE_LIBS Threads::Threads ${CMAKE_DL_LIBS})
 elseif(WIN32)
-    # rustc --print native-static-libs for GNU Windows targets.
+    # rustc --print native-static-libs for GNU Windows targets. LLVM MinGW
+    # exposes the newer ARM64 imports through their API-set libraries.
     set(NATIVE_LIBS kernel32 ntdll userenv ws2_32 dbghelp)
+    if(RUST_TARGET STREQUAL "aarch64-pc-windows-gnullvm")
+        list(APPEND NATIVE_LIBS synchronization bcryptprimitives)
+    endif()
 elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     message(FATAL_ERROR "Supported toolchains: Linux, macOS, MinGW/Rtools and Emscripten")
 endif()
@@ -269,7 +273,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 if(DUCKSASSY_WEBR_EXTENSION)
     target_compile_options(ducksassy PRIVATE -fwasm-exceptions)
-    target_link_options(ducksassy PRIVATE -fwasm-exceptions -sSIDE_MODULE=2
+    target_link_options(ducksassy PRIVATE -O1 -fwasm-exceptions -sSIDE_MODULE=2
         -sEXPORTED_FUNCTIONS=_ducksassy_init_c_api -Wl,-Bsymbolic)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(ducksassy PRIVATE -Wl,--exclude-libs,ALL)
