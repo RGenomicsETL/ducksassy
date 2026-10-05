@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest, windows-11-arm]
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
@@ -26,7 +26,12 @@ jobs:
       - name: Install the Rust GNU target for Rtools
         if: runner.os == 'Windows'
         shell: bash
-        run: rustup target add x86_64-pc-windows-gnu
+        run: |
+          if [ "${{ runner.arch }}" = "ARM64" ]; then
+            rustup target add aarch64-pc-windows-gnullvm
+          else
+            rustup target add x86_64-pc-windows-gnu
+          fi
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: release

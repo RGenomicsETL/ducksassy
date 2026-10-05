@@ -7,3 +7,4 @@
   output.
 - Compile the bundled C and Rust sources offline with runtime selection of the
   scalar, AVX2, AVX-512 or NEON search backend.
+- Build webR side modules and native Windows ARM64 extension binaries.
