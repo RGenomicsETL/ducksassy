@@ -17,6 +17,10 @@ jobs:
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -51,6 +55,17 @@ jobs:
       - name: SQL examples and panic-ABI distribution gate
         # MVP/EH use a fail-stop panic ABI; a fresh worker must recover.
         run: make wasm-playwright-test
+      - name: Build the webR side module
+        run: |
+          rustup target add wasm32-unknown-emscripten
+          make r-bootstrap
+          cd r/Rducksassy
+          export R_HOME="$(R RHOME)"
+          emconfigure ./configure --build="$(gcc -dumpmachine)" \
+            --host=wasm32-unknown-emscripten ac_cv_func_getrandom=no
+          test -s src/ducksassy.duckdb_extension
+          grep -a -q 'ducksassy_init_c_api' src/ducksassy.duckdb_extension
+          grep -a -q 'linux_i686_musl' src/ducksassy.duckdb_extension
       - uses: actions/upload-artifact@v4
         if: always()
         with:

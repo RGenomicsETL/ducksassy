@@ -174,11 +174,12 @@ inspection does not work under ptrace; unsanitized CTest retains QEMU coverage.
 DuckHTS is not loaded by the sanitizer job, and Rust archives are not instrumented.
 
 `cran-check.yml` builds a self-contained R source tarball and checks its unpacked
-contents with `r-lib/actions/check-r-package` on Linux, macOS and Windows, using
-R release and the stable CRAN `duckdb` package. Package tests load the bundled
-v1 extension and exercise scalar, table and backend-inspection functions.
-R-devel/source-built DuckDB compatibility is outside this binary-oriented
-matrix.
+contents with `r-lib/actions/check-r-package` on Linux, macOS, Windows x86-64
+and Windows ARM64, using R release and the stable CRAN `duckdb` package. The
+Wasm workflow also cross-builds the package's webR side module. Package tests
+load the bundled v1 extension and exercise scalar, table and backend-inspection
+functions. R-devel/source-built DuckDB compatibility is outside this
+binary-oriented matrix.
 
 `test/native_load.py` checks native catalog types, repeated `LOAD`, fresh file
 close/reopen, read-only primary loading, unchanged database bytes and worker
