@@ -243,7 +243,22 @@ elseif(WIN32)
     # exposes the newer ARM64 imports through their API-set libraries.
     set(NATIVE_LIBS kernel32 ntdll userenv ws2_32 dbghelp)
     if(RUST_TARGET STREQUAL "aarch64-pc-windows-gnullvm")
-        list(APPEND NATIVE_LIBS synchronization bcryptprimitives)
+        find_library(BCRYPTPRIMITIVES_LIBRARY NAMES bcryptprimitives)
+        if(NOT BCRYPTPRIMITIVES_LIBRARY)
+            get_filename_component(DUCKSASSY_COMPILER_DIR "${CMAKE_C_COMPILER}" DIRECTORY)
+            find_program(DUCKSASSY_DLLTOOL NAMES llvm-dlltool dlltool
+                HINTS "${DUCKSASSY_COMPILER_DIR}" REQUIRED)
+            set(BCRYPTPRIMITIVES_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/libbcryptprimitives.a")
+            execute_process(
+                COMMAND ${DUCKSASSY_DLLTOOL} -m arm64
+                    -d "${CMAKE_CURRENT_SOURCE_DIR}/src/bcryptprimitives.def"
+                    -l "${BCRYPTPRIMITIVES_LIBRARY}"
+                RESULT_VARIABLE BCRYPTPRIMITIVES_RESULT)
+            if(NOT BCRYPTPRIMITIVES_RESULT EQUAL 0)
+                message(FATAL_ERROR "Could not create the ARM64 bcryptprimitives import library")
+            endif()
+        endif()
+        list(APPEND NATIVE_LIBS synchronization "${BCRYPTPRIMITIVES_LIBRARY}")
     endif()
 elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     message(FATAL_ERROR "Supported toolchains: Linux, macOS, MinGW/Rtools and Emscripten")

@@ -3,6 +3,7 @@ rust/Cargo.toml|src/extension/rust/Cargo.toml
 rust/Cargo.lock|src/extension/rust/Cargo.lock
 rust/src/lib.rs|src/extension/rust/src/lib.rs
 include/sassy_c.h|src/extension/include/sassy_c.h
+src/bcryptprimitives.def|src/extension/src/bcryptprimitives.def
 src/ducksassy_core.c|src/extension/src/ducksassy_core.c
 src/ducksassy_core.h|src/extension/src/ducksassy_core.h
 src/host_v1.c|src/extension/src/host_v1.c
